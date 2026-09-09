@@ -3,6 +3,7 @@ import React from "react";
 import CardHeader from "@mui/material/CardHeader";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
+import packageJson from "../package.json";
 
 export function Header({
   title,
@@ -16,7 +17,7 @@ export function Header({
   return (
     <>
       <CardHeader
-        title={title}
+        title={title && <>{title}{" "}<Typography component="span" variant="caption" color="text.secondary">v{packageJson.version}</Typography></>}
         action={action}
         sx={{ bgcolor: "background.paper" }}
         titleTypographyProps={{

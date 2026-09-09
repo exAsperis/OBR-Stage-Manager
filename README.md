@@ -19,7 +19,7 @@ ignored by Git so it cannot replace the production manifest accidentally:
 ```json
 {
   "name": "Stage Manager (Local)",
-  "version": "1.0.0-local",
+  "version": "1.0.1-local",
   "manifest_version": 1,
   "author": "es Asperis",
   "icon": "/logo.png",
@@ -28,7 +28,7 @@ ignored by Git so it cannot replace the production manifest accidentally:
   "action": {
     "title": "Stage Manager (Local)",
     "icon": "/icon.svg",
-    "popover": "/extension.html?v=1.0.0-local",
+    "popover": "/extension.html?v=1.0.1-local",
     "height": 129,
     "width": 375
   }

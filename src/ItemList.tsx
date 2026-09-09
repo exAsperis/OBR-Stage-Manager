@@ -21,14 +21,15 @@ import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import type { Item } from "@owlbear-rodeo/sdk";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { ItemListItem } from "./ItemListItem";
 import { LayerIcon } from "./LayerIcon";
 import { SortableItem } from "./SortableItem";
 import { capitalize } from "./helpers";
 import type { StackOperation } from "./stacking";
 import { useOwlbearStore } from "./useOwlbearStore";
-import { isLinkedVirtualLayer, parseStatefulVirtualLayerName, resolveGroupId, UNASSIGNED_ID, type VirtualLayerDefinition } from "./virtualLayers";
+import { isLinkedVirtualLayer, resolveGroupId, UNASSIGNED_ID, type VirtualLayerDefinition } from "./virtualLayers";
+import { parseVirtualLayerPath } from "./virtualLayerName";
 import type { DropPosition } from "./dragPosition";
 import { SendMenuButton } from "./SendMenuButton";
 import { getLayerPropertyState } from "./layerPropertyState";
@@ -43,6 +44,15 @@ import { useLayerDisplaySettings } from "./layerSettings";
 import { participationDescription, resolveParticipationModel } from "./participation";
 
 const NATIVE_LAYER_HEADER_HEIGHT = 40;
+
+function VirtualLayerHeading({ name, itemCount }: { name: string; itemCount: number }) {
+  const path = parseVirtualLayerPath(name);
+  if (!path) return <>{name} [{itemCount}]</>;
+  return <>{path.segments.map((segment, index) => <Fragment key={`${index}-${segment.kind}`}>
+    {index > 0 && "/"}
+    {segment.kind === "state" ? <>{segment.group}:{" "}<Box component="span" sx={{ color: "info.main" }}>{segment.state}</Box></> : segment.name}
+  </Fragment>)} [{itemCount}]</>;
+}
 
 interface Props {
   layer: Item["layer"];
@@ -111,11 +121,10 @@ function Group({ definition, items, role, searching, groupDropPosition, onRename
   const participation = model.byDefinitionId.get(definition.id);
   const unassigned = definition.id === UNASSIGNED_ID;
   const groupHeading = `${definition.name} [${items.length}]`;
-  const statefulName = !unassigned && parseStatefulVirtualLayerName(definition.name);
   const showNonStateActions = hovering || focusWithin || sendMenuOpen;
   const row = <ListItemButton dense onClick={() => setOpen(!open)} aria-expanded={open} onPointerOver={(event) => { if (event.pointerType === "mouse") setHovering(true); }} onPointerLeave={(event) => { if (event.pointerType === "mouse") setHovering(false); }} onFocus={() => setFocusWithin(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false); }} sx={{ height: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: "background.default", color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
     <ListItemIcon sx={{ color: participation && !participation.participating ? "warning.main" : selected ? "primary.main" : "text.secondary", minWidth: "28px", "& svg": { fontSize: 16 } }}><Tooltip title={participation ? participationDescription(participation) : linked ? "Linked virtual layer" : "Virtual layer"}>{linked ? <LinkIcon aria-label="Linked virtual layer" /> : <VirtualLayerIcon aria-label="Virtual layer" />}</Tooltip></ListItemIcon>
-    <ListItemText primary={<OverflowTooltipText text={`${groupHeading}${participation && !participation.participating ? " — suppressed" : ""}`}>{statefulName ? <>{statefulName.group}:{" "}<Box component="span" sx={{ color: "info.main" }}>{statefulName.state}</Box> [{items.length}]</> : groupHeading}{participation && !participation.participating && <Box component="span" sx={{ color: "warning.main" }}> — suppressed</Box>}</OverflowTooltipText>} sx={{ minWidth: 0 }} primaryTypographyProps={{ fontStyle: "italic" }} />
+    <ListItemText primary={<OverflowTooltipText text={`${groupHeading}${participation && !participation.participating ? " — suppressed" : ""}`}><VirtualLayerHeading name={definition.name} itemCount={items.length} />{participation && !participation.participating && <Box component="span" sx={{ color: "warning.main" }}> — suppressed</Box>}</OverflowTooltipText>} sx={{ minWidth: 0 }} primaryTypographyProps={{ fontStyle: "italic" }} />
     {role === "GM" && <Stack direction="row" alignItems="center" flexShrink={0}>
       {showNonStateActions && <>{!unassigned && <><Tooltip title="Edit"><IconButton size="small" onClick={(event) => { event.stopPropagation(); onRename(definition); }}><EditIcon fontSize="small" /></IconButton></Tooltip><Tooltip title="Delete"><IconButton size="small" onClick={(event) => { event.stopPropagation(); onDelete(definition); }}><DeleteIcon fontSize="small" /></IconButton></Tooltip></>}<SendMenuButton itemIds={items.map((item) => item.id)} allowStackWhenEmpty onStack={(operation) => onGroupStack(definition.obrLayer, definition.id, operation)} confirmLayerMove={definition.name} onOpenChange={setSendMenuOpen} /></>}
       <LayerPropertyControls items={items} scope={{ kind: "group", layer: definition.obrLayer, groupId: definition.id }} fog={definition.obrLayer === "FOG"} />

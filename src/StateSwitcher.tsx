@@ -27,7 +27,7 @@ function StateButton({ group, state, active, suppressed, disabled, vertical, onA
   const id = `${group.toLocaleLowerCase()}\u0000${state.name.toLocaleLowerCase()}`;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, data: { group, state: state.name } });
   return <Box ref={setNodeRef} sx={{ minWidth: 40, width: vertical ? "100%" : undefined, height: 40, display: "flex", alignItems: "center", justifyContent: "center", transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 1 : undefined }}>
-    <Button {...attributes} {...listeners} size="small" color={active ? suppressed ? "warning" : "primary" : "inherit"} variant={active && !suppressed ? "contained" : "outlined"} disabled={disabled} aria-pressed={active} title={active && suppressed ? "Selected locally; guardian is not participating" : undefined} onClick={onActivate} sx={{ minWidth: 0, maxWidth: "100%", height: 24, minHeight: 24, py: 0, px: 1, whiteSpace: "normal", textTransform: "none", cursor: isDragging ? "grabbing" : "grab" }}>
+    <Button {...attributes} {...listeners} size="small" color={active ? "primary" : "inherit"} variant={active && !suppressed ? "contained" : "outlined"} disabled={disabled} aria-pressed={active} title={active && suppressed ? "Selected locally; guardian is not participating" : undefined} onClick={onActivate} sx={{ minWidth: 0, maxWidth: "100%", height: 24, minHeight: 24, py: 0, px: 1, whiteSpace: "normal", textTransform: "none", cursor: isDragging ? "grabbing" : "grab" }}>
       {state.name}
     </Button>
   </Box>;
@@ -59,8 +59,7 @@ function StateGroupRow({ group, label, guardianParticipating, switching, activat
   const vertical = orientation === "vertical";
   return <Box sx={{ display: "contents" }}>
     <Box sx={{ width: "100%", minWidth: 0, overflow: "hidden", textAlign: vertical ? "center" : undefined, alignSelf: "center" }} title={label}>
-      <Typography variant="caption" fontWeight={700} display="block" noWrap textOverflow="ellipsis" overflow="hidden">{label}</Typography>
-      {!guardianParticipating && <Typography variant="caption" color="warning.main" display="block" noWrap textOverflow="ellipsis" overflow="hidden">guardian suppressed</Typography>}
+      <Typography variant="caption" color={guardianParticipating ? undefined : "warning.main"} fontWeight={700} display="block" noWrap textOverflow="ellipsis" overflow="hidden">{label}</Typography>
     </Box>
     <Tooltip title={`Suppress all ${label} states`}><span><IconButton sx={iconButtonSx} color={allStatesSuppressed ? "primary" : "default"} disabled={switching} aria-label={`Suppress all ${label} states`} aria-pressed={allStatesSuppressed} onClick={hideAll}><HideAllStatesIcon /></IconButton></span></Tooltip>
     <Tooltip title={`Previous ${label} state`}><span><IconButton sx={iconButtonSx} disabled={switching || group.states.length < 2} aria-label={`Previous ${label} state`} onClick={() => step(-1)}>{vertical ? <PreviousVerticalIcon /> : <PreviousIcon />}</IconButton></span></Tooltip>

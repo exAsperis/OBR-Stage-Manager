@@ -217,6 +217,7 @@ export function Items({ search }: { search: string }) {
         ><HideEmptyLayersIcon fontSize="small" /></IconButton></span></Tooltip>
         <Tooltip title="Show all populated layers"><span><IconButton
           size="small"
+          color={populatedHiddenLayers.length ? "info" : "default"}
           disabled={!populatedHiddenLayers.length}
           aria-label="Show all populated layers"
           onClick={(event) => { event.stopPropagation(); setLayersEnabled(populatedHiddenLayers, true); }}
