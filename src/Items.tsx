@@ -233,10 +233,10 @@ export function Items({ search }: { search: string }) {
       submitLabel={nameDialog.mode === "create" ? "Create" : "Rename"}
       linkedLayerCount={nameDialog.mode === "rename" ? linkedVirtualLayers(virtualLayers, nameDialog.definition.id).length : 1}
       dependentLayerCount={nameDialog.mode === "rename" ? dependentVirtualLayers(virtualLayers, nameDialog.definition.id).length : 0}
-      guardianOptions={nameDialog.mode === "rename" ? virtualLayers.layers
-        .filter((definition) => normalizedVirtualLayerName(definition.name) !== normalizedVirtualLayerName(nameDialog.definition.name))
+      guardianOptions={virtualLayers.layers
+        .filter((definition) => nameDialog.mode === "create" || normalizedVirtualLayerName(definition.name) !== normalizedVirtualLayerName(nameDialog.definition.name))
         .filter((definition, index, definitions) => definitions.findIndex((candidate) => normalizedVirtualLayerName(candidate.name) === normalizedVirtualLayerName(definition.name)) === index)
-        .map((definition) => ({ id: definition.id, name: definition.name })) : []}
+        .map((definition) => ({ id: definition.id, name: definition.name }))}
       onCancel={() => setNameDialog(undefined)}
       onSubmit={saveName}
     />}
