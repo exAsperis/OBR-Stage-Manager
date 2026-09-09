@@ -87,7 +87,7 @@ Other source changes are hot-reloaded by Vite during development.
 - Tailor the panel for prep or play with per-device feature and layer settings;
   a live Total count still calls out objects in layers hidden from the outline.
 
-See the [user guide](https://outliner-plus.ex-asperis.com/#overview) for a scene-building workflow, a state-linked layer example, and a concise control reference.
+See the [user guide](https://obr-stage-manager.ex-asperis.com/#overview) for a scene-building workflow, a state-linked layer example, and a concise control reference.
 
 ## 1.0 compatibility
 
@@ -108,21 +108,21 @@ Azure deployment token to the GitHub repository as the
 
 Pushes to `beta` deploy to Azure's stable `beta` environment. The Vite build
 generates environment-specific manifests automatically: production assets use
-`https://outliner-plus.ex-asperis.com`, while beta assets use
+`https://obr-stage-manager.ex-asperis.com`, while beta assets use
 `https://outliner-plus-beta.ex-asperis.com` and the `Stage Manager Beta` identity.
 
 After Azure assigns the production hostname, use its absolute manifest URL when
 installing the extension in Owlbear Rodeo, for example:
 
 ```text
-https://outliner-plus.ex-asperis.com/manifest.json
+https://obr-stage-manager.ex-asperis.com/manifest.json
 ```
 
 ## Upstream
 
 The Git remotes are configured as:
 
-- `origin`: `https://github.com/exAsperis/OBR-Outliner-plus.git`
+- `origin`: `https://github.com/exAsperis/OBR-Stage-Manager.git`
 - `upstream`: `https://github.com/owlbear-rodeo/outliner.git`
 
 ## License

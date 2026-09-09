@@ -5,7 +5,7 @@ import { cpSync, readFileSync, writeFileSync } from 'node:fs'
 
 const packageVersion = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version as string
 const beta = process.env.OUTLINER_BUILD_CHANNEL === 'beta'
-const publicOrigin = beta ? 'https://outliner-plus-beta.ex-asperis.com' : 'https://outliner-plus.ex-asperis.com'
+const publicOrigin = beta ? 'https://outliner-plus-beta.ex-asperis.com' : 'https://obr-stage-manager.ex-asperis.com'
 const releaseVersion = beta ? `${packageVersion}-beta` : packageVersion
 
 function manifest() {
@@ -16,7 +16,7 @@ function manifest() {
     version: releaseVersion,
     manifest_version: 1,
     author: 'es Asperis',
-    homepage_url: 'https://github.com/exAsperis/OBR-Outliner-plus',
+    homepage_url: 'https://github.com/exAsperis/OBR-Stage-Manager',
     icon: `${publicOrigin}/logo.png?v=${releaseVersion}`,
     background_url: `${publicOrigin}/background.html?v=${releaseVersion}`,
     description: 'Manage layers, search for items, and view an enhanced outline of your scenes',
