@@ -5,8 +5,8 @@ import { getLocalItemProperty, getStoredLocalItemState } from "./localItemState.
 import { resolveParticipationModel, type ResolvedParticipationModel } from "./participation.ts";
 import { getInheritanceBoundary } from "./inheritanceBoundary.ts";
 
-const ITEM_INHERITANCE_METADATA_KEY = "com.ex-asperis.outliner/v1/stateInheritance";
-const VIRTUAL_LAYER_METADATA_KEY = "com.ex-asperis.outliner/v1/virtualLayer";
+const ITEM_INHERITANCE_METADATA_KEY = "com.ex-asperis.obr-stage-manager/v1/stateInheritance";
+const VIRTUAL_LAYER_METADATA_KEY = "com.ex-asperis.obr-stage-manager/v1/virtualLayer";
 const UNASSIGNED_ID = "__unassigned__";
 
 export type { StatefulProperty } from "./virtualLayers";

@@ -9,7 +9,7 @@ import { isTextable, toPlainText } from "./helpers";
 import { stackItems } from "./stackItems";
 import type { StackOperation } from "./stacking";
 import { useOwlbearStore } from "./useOwlbearStore";
-import { UNASSIGNED_ID, orderedGroupIds, resolveGroupId, type VirtualLayerDefinition } from "./virtualLayers";
+import { dependentVirtualLayers, linkedVirtualLayers, normalizedVirtualLayerName, UNASSIGNED_ID, orderedGroupIds, resolveGroupId, type VirtualLayerDefinition } from "./virtualLayers";
 import { addVirtualLayer, assignItems, moveStackingGroup, removeVirtualLayer, stackVirtualLayer, updateVirtualLayerName } from "./virtualLayerService";
 import { getVerticalDropPosition, getVerticalDropPositionAtPoint, type DropPosition } from "./dragPosition";
 import { getOutlinerLayers, OUTLINER_LAYERS_TOP_TO_BOTTOM } from "./layers";
@@ -128,10 +128,10 @@ export function Items({ search }: { search: string }) {
 
   function openCreate(layer: Item["layer"]) { setNameDialog({ mode: "create", layer }); }
   function openRename(definition: VirtualLayerDefinition) { setNameDialog({ mode: "rename", definition }); }
-  async function saveName(name: string) {
+  async function saveName(name: string, renameLinked: boolean) {
     if (!nameDialog) return;
     if (nameDialog.mode === "create") await addVirtualLayer(nameDialog.layer, name);
-    else await updateVirtualLayerName(nameDialog.definition.id, name);
+    else await updateVirtualLayerName(nameDialog.definition.id, name, renameLinked);
     setNameDialog(undefined);
   }
   function confirmDelete(definition: VirtualLayerDefinition) { if (window.confirm(`Delete virtual layer "${definition.name}"?\nIts objects will become Unassigned. No objects will be deleted.`)) void removeVirtualLayer(definition.id).catch(() => window.alert("Unable to delete the virtual layer.")); }
@@ -231,6 +231,12 @@ export function Items({ search }: { search: string }) {
       title={nameDialog.mode === "create" ? "Create virtual layer" : "Rename virtual layer"}
       initialValue={nameDialog.mode === "rename" ? nameDialog.definition.name : ""}
       submitLabel={nameDialog.mode === "create" ? "Create" : "Rename"}
+      linkedLayerCount={nameDialog.mode === "rename" ? linkedVirtualLayers(virtualLayers, nameDialog.definition.id).length : 1}
+      dependentLayerCount={nameDialog.mode === "rename" ? dependentVirtualLayers(virtualLayers, nameDialog.definition.id).length : 0}
+      guardianOptions={nameDialog.mode === "rename" ? virtualLayers.layers
+        .filter((definition) => normalizedVirtualLayerName(definition.name) !== normalizedVirtualLayerName(nameDialog.definition.name))
+        .filter((definition, index, definitions) => definitions.findIndex((candidate) => normalizedVirtualLayerName(candidate.name) === normalizedVirtualLayerName(definition.name)) === index)
+        .map((definition) => ({ id: definition.id, name: definition.name })) : []}
       onCancel={() => setNameDialog(undefined)}
       onSubmit={saveName}
     />}

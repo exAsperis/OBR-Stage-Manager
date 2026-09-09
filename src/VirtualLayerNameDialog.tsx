@@ -4,18 +4,29 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useState, type FormEvent } from "react";
 
-export function VirtualLayerNameDialog({ title, initialValue = "", submitLabel, onCancel, onSubmit }: {
+export interface GuardianLayerOption { id: string; name: string }
+
+export function VirtualLayerNameDialog({ title, initialValue = "", submitLabel, linkedLayerCount = 1,
+  dependentLayerCount = 0, guardianOptions = [], onCancel, onSubmit }: {
   title: string;
   initialValue?: string;
   submitLabel: string;
+  linkedLayerCount?: number;
+  dependentLayerCount?: number;
+  guardianOptions?: GuardianLayerOption[];
   onCancel: () => void;
-  onSubmit: (name: string) => Promise<void>;
+  onSubmit: (name: string, renameLinked: boolean) => Promise<void>;
 }) {
   const [name, setName] = useState(initialValue);
+  const [renameLinked, setRenameLinked] = useState(false);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
 
@@ -25,7 +36,7 @@ export function VirtualLayerNameDialog({ title, initialValue = "", submitLabel, 
     setSaving(true);
     setError(undefined);
     try {
-      await onSubmit(name);
+      await onSubmit(name, renameLinked);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to save the virtual layer name.");
       setSaving(false);
@@ -47,6 +58,33 @@ export function VirtualLayerNameDialog({ title, initialValue = "", submitLabel, 
           helperText="Use group: state for alternatives and / for guardian dependencies."
           inputProps={{ "aria-label": "Virtual layer name" }}
         />
+        {guardianOptions.length > 0 && <TextField
+          select
+          fullWidth
+          margin="dense"
+          label="Prepend guardian layer"
+          value=""
+          disabled={saving}
+          onChange={(event) => {
+            const guardian = guardianOptions.find((option) => option.id === event.target.value);
+            if (guardian) setName(`${guardian.name}/${name}`);
+          }}
+          InputLabelProps={{ shrink: true }}
+          SelectProps={{ displayEmpty: true }}
+          inputProps={{ "aria-label": "Prepend guardian layer" }}
+        >
+          <MenuItem value="" disabled>Select a virtual layer…</MenuItem>
+          {guardianOptions.map((option) => <MenuItem key={option.id} value={option.id}>{option.name}</MenuItem>)}
+        </TextField>}
+        {linkedLayerCount > 1 && <Stack>
+          <FormControlLabel
+            control={<Switch checked={renameLinked} disabled={saving} onChange={(event) => setRenameLinked(event.target.checked)} />}
+            label={`Rename all ${linkedLayerCount} linked virtual layers`}
+          />
+          {dependentLayerCount > 0 && <Typography variant="caption" color="text.secondary" sx={{ ml: 6 }}>
+            {dependentLayerCount} dependent layers will also be renamed to maintain their dependent relationship.
+          </Typography>}
+        </Stack>}
         {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
       </DialogContent>
       <DialogActions>

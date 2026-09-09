@@ -58,7 +58,7 @@ test("competing suppression keeps the original local state until every override 
   assert.equal(target.visible, true);
 });
 
-test("local edits made through Outliner update the shadow while an override is active", () => {
+test("local edits made through Stage Manager update the shadow while an override is active", () => {
   const target = item();
   applyEffectiveItemState(target, { visible: true });
   assert.equal(updateShadowedLocalItemProperty(target, "visible", true), true);

@@ -1,6 +1,6 @@
 import OBR from "@owlbear-rodeo/sdk";
 import { EXTENSION_ID } from "./constants";
-import { hasBoundaryViolation, stateFromMetadata } from "./virtualLayers";
+import { hasBoundaryViolation, stateFromMetadata, type VirtualLayerState } from "./virtualLayers";
 import { enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers } from "./virtualLayerService";
 
 const SEND_CONTEXT_MENU_ID = `${EXTENSION_ID}/send`;
@@ -10,6 +10,7 @@ let unsubscribeItems: (() => void) | undefined;
 let unsubscribeMetadata: (() => void) | undefined;
 let reconciling = false;
 let reconcilePending = false;
+let latestMetadataState: VirtualLayerState | undefined;
 
 async function reconcile() {
   if (reconciling) {
@@ -21,7 +22,10 @@ async function reconcile() {
     do {
       reconcilePending = false;
       if (isVirtualLayerWriteInFlight() || !(await OBR.scene.isReady()) || (await OBR.player.getRole()) !== "GM") continue;
-      const state = stateFromMetadata(await OBR.scene.getMetadata());
+      // Metadata change events carry the authoritative snapshot. Re-reading
+      // immediately after an event can briefly return the previous value in a
+      // separate extension iframe, which makes a completed state switch revert.
+      const state = latestMetadataState ?? stateFromMetadata(await OBR.scene.getMetadata());
       const items = await OBR.scene.items.getItems();
       const layers = [...new Set(state.layers.map((entry) => entry.obrLayer))]
         .filter((layer) => hasBoundaryViolation(items, state, layer));
@@ -33,9 +37,14 @@ async function reconcile() {
 
 async function startReconciliation() {
   unsubscribeItems?.(); unsubscribeMetadata?.();
+  latestMetadataState = undefined;
   if (!(await OBR.scene.isReady())) return;
+  latestMetadataState = stateFromMetadata(await OBR.scene.getMetadata());
   unsubscribeItems = OBR.scene.items.onChange(() => { void reconcile(); });
-  unsubscribeMetadata = OBR.scene.onMetadataChange(() => { void reconcile(); });
+  unsubscribeMetadata = OBR.scene.onMetadataChange((metadata) => {
+    latestMetadataState = stateFromMetadata(metadata);
+    void reconcile();
+  });
   await reconcile();
 }
 

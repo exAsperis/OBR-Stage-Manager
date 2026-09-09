@@ -1,6 +1,6 @@
-# Outliner+ for Owlbear Rodeo
+# Stage Manager for Owlbear Rodeo
 
-Outliner+ helps you turn a crowded Owlbear Scene into something you can understand at a glance and operate confidently while your players are waiting. Use virtual layers to arrange related scenery, prepare alternate versions of a location, and keep the controls you need during play close at hand.
+Stage Manager helps you turn a crowded Owlbear Scene into something you can understand at a glance and operate confidently while your players are waiting. Use virtual layers to arrange related scenery, prepare alternate versions of a location, and keep the controls you need during play close at hand.
 
 ## Overview
 
@@ -51,9 +51,9 @@ Name each alternative with the same virtual-layer group name, a colon, and a dif
 
 The group name and state label may be any non-empty text. Spaces around the colon are trimmed, and names are matched without regard to capitalization. These groups form a mutually exclusive transparency family, marked by a green Transparency control. By making objects invisible (scaled to 0x0) rather than hidden, unused objects from one state or level won't visually interfere with the GM's view of the current state or level.
 
-During prep, make every alternative except the opening state transparent. During play, restore the alternative you want to reveal. Outliner+ automatically makes the other states in that virtual-layer group transparent, so only the chosen version—or its set of exact-name linked layers—remains on the map. If one state uses artwork in several native layers, repeat the exact full name, such as `Manor: Burning`, in each layer to link that state together.
+During prep, make every alternative except the opening state transparent. During play, restore the alternative you want to reveal. Stage Manager automatically makes the other states in that virtual-layer group transparent, so only the chosen version—or its set of exact-name linked layers—remains on the map. If one state uses artwork in several native layers, repeat the exact full name, such as `Manor: Burning`, in each layer to link that state together.
 
-When state-linked virtual layers exist, the fixed scene-state switcher below the Outliner+ header lists each group and its available states. Select a state there to restore it and make the other states in its group transparent without finding those layers in the hierarchy. Drag the state buttons to arrange them in the order that best fits the scene, then use the arrow buttons at either end to step backward or forward through that order.
+When state-linked virtual layers exist, the fixed scene-state switcher below the Stage Manager header lists each group and its available states. Select a state there to restore it and make the other states in its group transparent without finding those layers in the hierarchy. Drag the state buttons to arrange them in the order that best fits the scene, then use the arrow buttons at either end to step backward or forward through that order.
 
 This technique lets you stage a transformation as a single calm action instead of hiding and revealing dozens of objects while narrating. Restoring an item returns its saved scale and image-label opacity. Explicit inheritance instructions still take priority, so avoid enforcing a conflicting transparency value on a family you intend to switch live.
 
@@ -76,7 +76,7 @@ The outline is most valuable when it keeps your attention on the table rather th
 - **Locate** centers the viewport on an item without changing your zoom and briefly highlights its bounds.
 - **Show/Hide** is ideal for spoilers, creatures waiting offstage, and clues that should appear at the right moment.
 - **Lock** finished scenery so an accidental drag cannot disrupt the map.
-- **Interaction** makes roofs, overlays, and other covering artwork click-through while leaving them manageable from Outliner+.
+- **Interaction** makes roofs, overlays, and other covering artwork click-through while leaving them manageable from Stage Manager.
 - **Transparency families** switch prepared location states while you continue narrating.
 - **Send** moves selected objects between native or virtual layers and adjusts their stacking position without hunting through the canvas.
 
@@ -97,7 +97,7 @@ Makes eligible contents fully transparent (even to the GM) by setting their scal
 
 ### Disable / Enable clicks
 
-Makes eligible items click-through or interactive. Click-through items remain available in Outliner+, which is often the easiest place to select them again.
+Makes eligible items click-through or interactive. Click-through items remain available in Stage Manager, which is often the easiest place to select them again.
 
 ### Lock / Unlock
 
@@ -125,4 +125,4 @@ Centers the viewport on an item and briefly highlights its bounds.
 
 ## Owlbear context menu
 
-Outliner+ adds **Send** to Owlbear Rodeo's item context menu. It uses the current canvas selection and offers the same stacking commands and native or virtual destinations as the outline, which is useful when the objects you want are already selected on the map.
+Stage Manager adds **Send** to Owlbear Rodeo's item context menu. It uses the current canvas selection and offers the same stacking commands and native or virtual destinations as the outline, which is useful when the objects you want are already selected on the map.

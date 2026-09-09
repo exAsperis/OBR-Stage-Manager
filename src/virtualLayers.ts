@@ -2,7 +2,8 @@ import type { Item } from "@owlbear-rodeo/sdk";
 import type { StackOperation } from "./stacking";
 import { canonicalizeVirtualLayerName, canonicalVirtualLayerIdentity, parseVirtualLayerPath } from "./virtualLayerName.ts";
 import { withoutBoundaryInheritance } from "./inheritanceBoundary.ts";
-import { LEGACY_VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYER_METADATA_KEY } from "./constants.ts";
+import { LEGACY_V1_VIRTUAL_LAYERS_METADATA_KEY, LEGACY_VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYER_METADATA_KEY } from "./constants.ts";
+import { isMigratableOutlinerV0Document, isMigratableOutlinerV1Document } from "./namespaceMigration.ts";
 
 export interface VirtualLayerDefinition {
   id: string;
@@ -132,7 +133,7 @@ export function stateFromMetadata(metadata: Record<string, unknown>) {
   return parseVirtualLayerState(metadata[VIRTUAL_LAYERS_METADATA_KEY]);
 }
 
-export type SceneModelCompatibility = "current" | "empty" | "legacy" | "invalid";
+export type SceneModelCompatibility = "current" | "empty" | "legacy" | "migratable" | "invalid";
 
 export function sceneModelCompatibility(metadata: Record<string, unknown>): SceneModelCompatibility {
   if (Object.prototype.hasOwnProperty.call(metadata, VIRTUAL_LAYERS_METADATA_KEY)) {
@@ -140,6 +141,8 @@ export function sceneModelCompatibility(metadata: Record<string, unknown>): Scen
     return value && typeof value === "object" && (value as { version?: unknown }).version === 3 &&
       Array.isArray((value as { layers?: unknown }).layers) ? "current" : "invalid";
   }
+  if (isMigratableOutlinerV1Document(metadata[LEGACY_V1_VIRTUAL_LAYERS_METADATA_KEY])) return "migratable";
+  if (isMigratableOutlinerV0Document(metadata[LEGACY_VIRTUAL_LAYERS_METADATA_KEY])) return "migratable";
   return Object.prototype.hasOwnProperty.call(metadata, LEGACY_VIRTUAL_LAYERS_METADATA_KEY) ? "legacy" : "empty";
 }
 
@@ -154,6 +157,13 @@ export function linkedVirtualLayers(state: VirtualLayerState, id: string) {
 
 export function isLinkedVirtualLayer(state: VirtualLayerState, id: string) {
   return linkedVirtualLayers(state, id).length > 1;
+}
+
+export function dependentVirtualLayers(state: VirtualLayerState, id: string) {
+  const target = state.layers.find((layer) => layer.id === id);
+  if (!target) return [];
+  const guardian = normalizedVirtualLayerName(target.name);
+  return state.layers.filter((layer) => normalizedVirtualLayerName(layer.name).startsWith(`${guardian}/`));
 }
 
 export interface StatefulVirtualLayerName {
@@ -285,6 +295,25 @@ export function renameVirtualLayer(state: VirtualLayerState, id: string, name: s
   if (!state.layers.some((entry) => entry.id === id)) throw new Error("Virtual layer does not exist.");
   const validName = validateName(name);
   return withoutBoundaryInheritance({ ...state, layers: state.layers.map((entry) => entry.id === id ? { ...entry, name: validName } : entry) });
+}
+
+export function renameLinkedVirtualLayers(state: VirtualLayerState, id: string, name: string): VirtualLayerState {
+  const target = state.layers.find((layer) => layer.id === id);
+  const linkedIds = new Set(linkedVirtualLayers(state, id).map((layer) => layer.id));
+  if (!linkedIds.size) throw new Error("Virtual layer does not exist.");
+  const validName = validateName(name);
+  const currentName = validateName(target!.name);
+  const dependentIds = new Set(dependentVirtualLayers(state, id).map((layer) => layer.id));
+  return withoutBoundaryInheritance({ ...state,
+    layers: state.layers.map((entry) => {
+      if (linkedIds.has(entry.id)) return { ...entry, name: validName };
+      if (dependentIds.has(entry.id)) {
+        const dependentName = validateName(entry.name);
+        return { ...entry, name: `${validName}${dependentName.slice(currentName.length)}` };
+      }
+      return entry;
+    }),
+  });
 }
 
 export function deleteVirtualLayer(state: VirtualLayerState, id: string): VirtualLayerState {

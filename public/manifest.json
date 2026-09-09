@@ -1,5 +1,5 @@
 {
-  "name": "Outliner+",
+  "name": "Stage Manager for Owlbear Rodeo",
   "version": "1.0.0",
   "manifest_version": 1,
   "author": "es Asperis",
@@ -8,7 +8,7 @@
   "background_url": "https://outliner-plus.ex-asperis.com/background.html?v=1.0.0",
   "description": "Manage layers, search for items, and view an enhanced outline of your scenes",
   "action": {
-    "title": "Outliner+",
+    "title": "Stage Manager",
     "icon": "https://outliner-plus.ex-asperis.com/icon.svg?v=1.0.0",
     "popover": "https://outliner-plus.ex-asperis.com/extension.html?v=1.0.0",
     "height": 129,

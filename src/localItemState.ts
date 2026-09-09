@@ -3,7 +3,7 @@ import type { InheritedItemState, StatefulProperty } from "./virtualLayers.ts";
 import { getItemVisible, getTransparentState } from "./transparentState.ts";
 
 // Kept literal so this pure module can run in Node's stripped-TypeScript test mode.
-const ITEM_LOCAL_STATE_METADATA_KEY = "com.ex-asperis.outliner/v1/localState";
+const ITEM_LOCAL_STATE_METADATA_KEY = "com.ex-asperis.obr-stage-manager/v1/localState";
 
 export interface StoredLocalItemState {
   version: 1;

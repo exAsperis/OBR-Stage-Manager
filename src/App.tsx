@@ -18,7 +18,7 @@ export function App() {
     return (
       <Box sx={{ p: 2 }}>
         <Typography variant="body2" sx={{ mb: 1 }}>
-          Outliner+ is a GM-only tool.
+          Stage Manager is a GM-only tool.
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Check out{" "}
@@ -39,7 +39,7 @@ export function App() {
     return <Outliner />;
   } else {
     return (
-      <Header title="Outliner+" subtitle="Open a scene to use the outliner" />
+      <Header title="Stage Manager" subtitle="Open a scene to manage it" />
     );
   }
 }

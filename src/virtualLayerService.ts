@@ -14,6 +14,7 @@ import {
   deleteVirtualLayer,
   getAssignmentId,
   parseVirtualLayerState,
+  renameLinkedVirtualLayers,
   renameVirtualLayer,
   reorderVirtualLayer,
   reorderStackingGroup,
@@ -38,10 +39,11 @@ import {
   withLinkedGroupProperty,
 } from "./stateInheritance";
 import { activateTransparency, getTransparentState, needsTransparencyEnforcement, restoreTransparency, setTransparentItemVisible } from "./transparentState";
-import { updateShadowedLocalItemProperty } from "./localItemState";
+import { storeLocalItemProperty, updateShadowedLocalItemProperty } from "./localItemState";
 import { applyEffectiveItemState } from "./effectiveItemState";
 import { getInheritanceBoundary } from "./inheritanceBoundary";
-import { reorderResolvedStateGroup, withStateGroupSelection } from "./participation";
+import { reorderResolvedStateGroup, resolveParticipationModel, withStateGroupSelection } from "./participation";
+import { runOutlinerV1NamespaceConversion } from "./namespaceMigration";
 
 let queue: Promise<void> = Promise.resolve();
 let writing = false;
@@ -119,10 +121,10 @@ export function addVirtualLayer(obrLayer: Item["layer"], name: string) {
   });
 }
 
-export function updateVirtualLayerName(id: string, name: string) {
+export function updateVirtualLayerName(id: string, name: string, renameLinked = false) {
   return serialized(async () => {
     const state = await getState();
-    const next = renameVirtualLayer(state, id, name);
+    const next = renameLinked ? renameLinkedVirtualLayers(state, id, name) : renameVirtualLayer(state, id, name);
     await setState(next);
     await enforceStateInheritance(next);
   });
@@ -418,9 +420,35 @@ export function setStatefulVirtualLayerSelection(groupId: string, stateName: str
   return serialized(async () => {
     const state = await getState();
     const next = withStateGroupSelection(state, groupId, stateName);
+    // State controls are authoritative: selecting a state must show it even if
+    // suppression previously captured direct transparency as the local value.
+    // Update the shadow before publishing the selection so either reconciler
+    // releases the same visible value, regardless of event ordering.
+    if (stateName !== null) {
+      const normalizedState = stateName.trim().toLocaleLowerCase();
+      const group = resolveParticipationModel(next).stateGroups.find((entry) => entry.id === groupId.trim().toLocaleLowerCase());
+      const selected = group?.states.find((entry) => entry.name.toLocaleLowerCase() === normalizedState);
+      const selectedLayerIds = new Set(selected?.layers.map((layer) => layer.id) ?? []);
+      if (selectedLayerIds.size) {
+        const items = await OBR.scene.items.getItems((item) => selectedLayerIds.has(getAssignmentId(item) ?? ""));
+        const transparentIds = items.filter((item) => Boolean(getTransparentState(item))).map((item) => item.id);
+        if (transparentIds.length) await OBR.scene.items.updateItems(transparentIds, (draft) => {
+          for (const item of draft) storeLocalItemProperty(item, "transparent", false);
+        }, true);
+      }
+    }
     await setState(next);
     await enforceStateInheritance(next);
   });
+}
+
+export function convertOutlinerV1Namespace() {
+  return serialized(() => runOutlinerV1NamespaceConversion({
+    getSceneMetadata: () => OBR.scene.getMetadata(),
+    getItems: () => OBR.scene.items.getItems(),
+    updateItems: (ids, update) => OBR.scene.items.updateItems(ids, update),
+    setSceneMetadata: (update) => OBR.scene.setMetadata(update),
+  }));
 }
 
 export { normalizeLayers };

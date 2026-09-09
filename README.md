@@ -1,4 +1,4 @@
-# Outliner+
+# Stage Manager for Owlbear Rodeo
 
 An enhanced fork of Owlbear Rodeo's [Outliner](https://github.com/owlbear-rodeo/outliner) extension.
 
@@ -18,15 +18,15 @@ ignored by Git so it cannot replace the production manifest accidentally:
 
 ```json
 {
-  "name": "Outliner+ (Local)",
+  "name": "Stage Manager (Local)",
   "version": "1.0.0-local",
   "manifest_version": 1,
   "author": "es Asperis",
   "icon": "/logo.png",
   "background_url": "/background.html",
-  "description": "Local development build of Outliner+",
+  "description": "Local development build of Stage Manager",
   "action": {
-    "title": "Outliner+ (Local)",
+    "title": "Stage Manager (Local)",
     "icon": "/icon.svg",
     "popover": "/extension.html?v=1.0.0-local",
     "height": 129,
@@ -49,13 +49,13 @@ command used by the original successful local test:
 ```
 
 Keep the server running. Open the following URL directly and confirm it displays
-JSON whose name is `Outliner+ (Local)`:
+JSON whose name is `Stage Manager (Local)`:
 
 ```text
 http://localhost:5173/manifest-local.json
 ```
 
-Add that exact `localhost` URL to the Owlbear profile and enable `Outliner+
+Add that exact `localhost` URL to the Owlbear profile and enable `Stage Manager
 (Local)` in a room. Do not substitute `127.0.0.1`, and do not use
 `/manifest.json`; the latter deliberately points to the production deployment.
 
@@ -70,7 +70,7 @@ If Owlbear reports `Failed to fetch`:
 
 Other source changes are hot-reloaded by Vite during development.
 
-## What Outliner+ is for
+## What Stage Manager is for
 
 - Turn a crowded Scene into a readable outline of locations, scenery, clues,
   creatures, and effects without changing their native Owlbear layers.
@@ -91,7 +91,7 @@ See the [user guide](https://outliner-plus.ex-asperis.com/#overview) for a scene
 
 ## 1.0 compatibility
 
-Outliner+ 1.0 introduces canonical dependency paths, explicit state selection and
+Stage Manager 1.0 introduces canonical dependency paths, explicit state selection and
 participation, inheritance boundaries, and a local-versus-effective property
 model. These semantics are intentionally incompatible with scene metadata from
 0.x. Version 1.0 stores its scene model in a new metadata namespace, leaves 0.x
@@ -109,7 +109,7 @@ Azure deployment token to the GitHub repository as the
 Pushes to `beta` deploy to Azure's stable `beta` environment. The Vite build
 generates environment-specific manifests automatically: production assets use
 `https://outliner-plus.ex-asperis.com`, while beta assets use
-`https://outliner-plus-beta.ex-asperis.com` and the `Outliner+ Beta` identity.
+`https://outliner-plus-beta.ex-asperis.com` and the `Stage Manager Beta` identity.
 
 After Azure assigns the production hostname, use its absolute manifest URL when
 installing the extension in Owlbear Rodeo, for example:

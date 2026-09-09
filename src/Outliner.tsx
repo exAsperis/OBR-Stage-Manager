@@ -4,6 +4,13 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import Box from "@mui/material/Box";
 import Alert from "@mui/material/Alert";
+import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import HelpIcon from "@mui/icons-material/HelpOutlineRounded";
 import SettingsIcon from "@mui/icons-material/SettingsRounded";
 import OBR from "@owlbear-rodeo/sdk";
@@ -21,6 +28,7 @@ import { resolveParticipationModel } from "./participation";
 import { ResizeHandles } from "./ResizeHandles";
 import { clampDimension, DEFAULT_OUTLINER_LAYOUT_SETTINGS, MAX_OUTLINER_HEIGHT, MAX_OUTLINER_WIDTH, readOutlinerLayoutSettings, type MinimizedOrientation, type OutlinerDimensions, type OutlinerLayoutSettings, writeOutlinerLayoutSettings } from "./outlinerLayout";
 import { MINIMIZED_LAYOUT_METADATA_KEY } from "./constants";
+import { convertOutlinerV1Namespace } from "./virtualLayerService";
 
 export function Outliner() {
   const listRef = useRef<HTMLUListElement>(null);
@@ -133,6 +141,22 @@ export function Outliner() {
   const [search, setSearch] = useState("");
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [conversionOpen, setConversionOpen] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [conversionError, setConversionError] = useState<string>();
+
+  const convertNamespace = async () => {
+    setConverting(true);
+    setConversionError(undefined);
+    try {
+      await convertOutlinerV1Namespace();
+      setConversionOpen(false);
+    } catch (error) {
+      setConversionError(error instanceof Error ? error.message : "The conversion failed unexpectedly. Please try again.");
+    } finally {
+      setConverting(false);
+    }
+  };
 
   useEffect(() => {
     // When a common key is pressed ensure the action is performed in OBR
@@ -196,7 +220,7 @@ export function Outliner() {
       }}
     >
       {!isMinimized && <Header
-        title={searchExpanded ? "" : "Outliner+"}
+        title={searchExpanded ? "" : "Stage Manager"}
         action={
           <Stack direction="row" alignItems="center">
             <SearchField
@@ -234,15 +258,39 @@ export function Outliner() {
       {!isMinimized && <SimpleBar style={{ minHeight: 0, flex: 1 }}>
         <List ref={listRef} disablePadding>
           {sceneModelCompatibility === "legacy" && <Alert severity="warning" sx={{ m: 1 }}>
-            This scene contains Outliner+ 0.x data. Version 1.0 leaves it untouched and does not apply it; recreate this scene's virtual layers to use the new model.
+            This scene contains data owned by the non-beta Outliner+ extension. Stage Manager leaves it untouched so it remains available to Outliner+.
+          </Alert>}
+          {sceneModelCompatibility === "migratable" && <Alert severity="warning" sx={{ m: 1 }} action={
+            <Button color="inherit" size="small" onClick={() => { setConversionError(undefined); setConversionOpen(true); }}>
+              Convert to Stage Manager
+            </Button>
+          }>
+            This scene contains compatible Outliner+ beta data. Convert it to use Stage Manager while retaining the original metadata as a fallback.
           </Alert>}
           {sceneModelCompatibility === "invalid" && <Alert severity="error" sx={{ m: 1 }}>
-            This scene's Outliner+ 1.0 data is invalid, so no virtual-layer, inheritance, or participation rules are being applied.
+            This scene's Stage Manager data is invalid, so no virtual-layer, inheritance, or participation rules are being applied.
           </Alert>}
           {settingsOpen && <SettingsPanel />}
           <Items search={search} />
         </List>
       </SimpleBar>}
+      <Dialog open={conversionOpen} onClose={() => { if (!converting) setConversionOpen(false); }}>
+        <DialogTitle>Convert this scene to Stage Manager?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Stage Manager will copy the compatible Outliner+ beta scene settings and item assignments to its new namespace. The original Outliner+ metadata will be retained.
+          </DialogContentText>
+          {conversionError && <Alert severity="error" sx={{ mt: 2 }}>
+            Conversion failed: {conversionError} No scene data was removed. Check your connection and try again.
+          </Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={converting} onClick={() => setConversionOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={converting} onClick={() => void convertNamespace()} startIcon={converting ? <CircularProgress size={16} color="inherit" /> : undefined}>
+            {converting ? "Converting…" : "Convert"}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <ResizeHandles
         dimensions={activeDimensions}
         widthEnabled={!isMinimized || !isVerticalMinimized}

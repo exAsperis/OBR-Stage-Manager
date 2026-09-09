@@ -1,5 +1,5 @@
 ---
-title: Outliner+
+title: Stage Manager for Owlbear Rodeo
 description: Prepare layered scenes, dramatic location changes, and faster live play
 author: es Asperis
 image: https://outliner-plus.ex-asperis.com/outliner-plus-hero.png
@@ -10,9 +10,9 @@ manifest: https://outliner-plus.ex-asperis.com/manifest.json
 learn-more: https://outliner-plus.ex-asperis.com
 ---
 
-# Outliner+
+# Stage Manager for Owlbear Rodeo
 
-Spend less game time hunting through a crowded Scene. Outliner+ gives you a readable outline for preparing layered locations and operating them while you narrate.
+Spend less game time hunting through a crowded Scene. Stage Manager gives you a readable outline for preparing layered locations and operating them while you narrate.
 
 - Arrange maps and scenery into meaningful groups such as Ground, Buildings, Roof, Furniture, and Clues.
 - Prepare alternate versions of a location and switch from intact to ruined, day to night, or mundane to magical with one control.
@@ -24,4 +24,4 @@ State alternatives such as `Manor: Intact` and `Manor: Burning` are mutually exc
 
 See the [user guide](https://outliner-plus.ex-asperis.com/#overview) for a practical scene-building workflow and a concise control reference.
 
-Outliner+ is an enhanced fork of Owlbear Rodeo's original Outliner extension.
+Stage Manager for Owlbear Rodeo is an enhanced fork of Owlbear Rodeo's original Outliner extension.

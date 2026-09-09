@@ -48,7 +48,7 @@ test("repeated activation preserves the first captured values while updating pro
 test("ignores malformed metadata without inventing restoration values", () => {
   assert.equal(parseTransparentState({ scale: { x: 1 }, visible: true, disableHit: false, source: "direct" }), undefined);
   const target = item();
-  target.metadata["com.ex-asperis.outliner/v1/transparentState"] = { broken: true };
+  target.metadata["com.ex-asperis.obr-stage-manager/v1/transparentState"] = { broken: true };
   assert.deepEqual(restoreTransparency(target), { restored: false, reactivate: false });
   assert.deepEqual(target.scale, { x: 2.5, y: -3 });
 });
@@ -81,7 +81,7 @@ test("hides image labels and restores their exact opacity", () => {
 
 test("upgrades existing transparency metadata by capturing the live label style", () => {
   const target = labeledImage() as Item & { text: { style: { fillOpacity: number; strokeOpacity: number } } };
-  target.metadata["com.ex-asperis.outliner/v1/transparentState"] = {
+  target.metadata["com.ex-asperis.obr-stage-manager/v1/transparentState"] = {
     scale: { x: 1, y: 1 }, visible: true, disableHit: false, source: "direct",
   };
   target.scale = { x: 0, y: 0 };

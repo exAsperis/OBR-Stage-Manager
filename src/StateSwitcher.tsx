@@ -112,7 +112,7 @@ export function StateSwitcher({ minimized = false, minimizedOrientation = "horiz
   return <Stack component="section" aria-label="Scene states" spacing={0.75} sx={{ px: 1, py: 0.75, flexShrink: 0, borderBottom: 1, borderColor: "divider", bgcolor: minimized ? "transparent" : "background.paper", boxSizing: "border-box", width: vertical ? "max-content" : undefined, height: vertical ? "100vh" : undefined, maxHeight: minimized ? (vertical ? "100vh" : "none") : "35vh", overflowY: minimized ? (vertical ? "auto" : "visible") : "auto", overflowX: vertical ? "visible" : undefined }}>
     <Stack direction="row" justifyContent="flex-end" alignItems="center" flexWrap="wrap" sx={{ width: "100%" }}>
       {minimized && <Tooltip title={`Use ${minimizedOrientation === "horizontal" ? "vertical" : "horizontal"} minified layout`}><IconButton sx={iconButtonSx} aria-label={`Use ${minimizedOrientation === "horizontal" ? "vertical" : "horizontal"} minified layout`} onClick={onOrientationToggle}><LayoutOrientationIcon /></IconButton></Tooltip>}
-      <Tooltip title={minimized ? "Restore Outliner" : "Minimize to scene states"}><IconButton sx={iconButtonSx} aria-label={minimized ? "Restore Outliner" : "Minimize to scene states"} onClick={onModeToggle}>{minimized ? <RestoreIcon /> : <MinimizeIcon />}</IconButton></Tooltip>
+      <Tooltip title={minimized ? "Restore Stage Manager" : "Minimize to scene states"}><IconButton sx={iconButtonSx} aria-label={minimized ? "Restore Stage Manager" : "Minimize to scene states"} onClick={onModeToggle}>{minimized ? <RestoreIcon /> : <MinimizeIcon />}</IconButton></Tooltip>
     </Stack>
     <Stack direction={vertical ? "row" : "column"} spacing={0.75} alignItems={vertical ? "flex-start" : undefined}>
       {groups.map((group) => {

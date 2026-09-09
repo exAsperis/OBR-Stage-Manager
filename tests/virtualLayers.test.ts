@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { LEGACY_VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYER_METADATA_KEY } from "../src/constants.ts";
+import { LEGACY_V1_VIRTUAL_LAYERS_METADATA_KEY, LEGACY_VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYER_METADATA_KEY } from "../src/constants.ts";
 import {
   UNASSIGNED_ID,
   calculateNormalizationUpdates,
@@ -20,6 +20,8 @@ import {
   parseVirtualLayerState,
   orderedGroupIds,
   renameVirtualLayer,
+  renameLinkedVirtualLayers,
+  dependentVirtualLayers,
   reorderVirtualLayer,
   reorderStackingGroup,
   sceneModelCompatibility,
@@ -119,9 +121,29 @@ test("parses schema-3 definitions and rejects incompatible schemas", () => {
 
 test("detects old and invalid scene metadata without interpreting it", () => {
   assert.equal(sceneModelCompatibility({}), "empty");
-  assert.equal(sceneModelCompatibility({ [LEGACY_VIRTUAL_LAYERS_METADATA_KEY]: { version: 2, layers: state.layers } }), "legacy");
+  assert.equal(sceneModelCompatibility({ [LEGACY_VIRTUAL_LAYERS_METADATA_KEY]: { version: 2, layers: state.layers } }), "migratable");
+  assert.equal(sceneModelCompatibility({ [LEGACY_VIRTUAL_LAYERS_METADATA_KEY]: { version: 1, layers: state.layers } }), "legacy");
+  assert.equal(sceneModelCompatibility({ [LEGACY_V1_VIRTUAL_LAYERS_METADATA_KEY]: state }), "migratable");
+  assert.equal(sceneModelCompatibility({ [LEGACY_V1_VIRTUAL_LAYERS_METADATA_KEY]: { version: 2, layers: state.layers } }), "empty");
   assert.equal(sceneModelCompatibility({ [VIRTUAL_LAYERS_METADATA_KEY]: { version: 2, layers: state.layers } }), "invalid");
   assert.equal(sceneModelCompatibility({ [VIRTUAL_LAYERS_METADATA_KEY]: state }), "current");
+  assert.equal(sceneModelCompatibility({ [VIRTUAL_LAYERS_METADATA_KEY]: state, [LEGACY_V1_VIRTUAL_LAYERS_METADATA_KEY]: state }), "current");
+});
+
+test("renames every currently linked virtual layer as one operation", () => {
+  const state: VirtualLayerState = { version: 3, layers: [
+    { id: "map", name: "Roof", obrLayer: "MAP", order: 0 },
+    { id: "prop", name: "roof", obrLayer: "PROP", order: 0 },
+    { id: "other", name: "Walls", obrLayer: "DRAWING", order: 0 },
+    { id: "child", name: "Roof/Lights: on", obrLayer: "PROP", order: 1 },
+    { id: "grandchild", name: "roof/Lights: on/Torches", obrLayer: "FOG", order: 0 },
+  ] };
+  assert.deepEqual(dependentVirtualLayers(state, "map").map((layer) => layer.id), ["child", "grandchild"]);
+  const renamed = renameLinkedVirtualLayers(state, "map", "House/Roof");
+  assert.deepEqual(renamed.layers.map((layer) => [layer.id, layer.name]), [
+    ["map", "House/Roof"], ["prop", "House/Roof"], ["other", "Walls"],
+    ["child", "House/Roof/Lights: on"], ["grandchild", "House/Roof/Lights: on/Torches"],
+  ]);
 });
 
 test("resolves missing, stale, and native-layer-mismatched assignments as Unassigned", () => {

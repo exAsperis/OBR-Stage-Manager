@@ -9,7 +9,8 @@ const publicOrigin = beta ? 'https://outliner-plus-beta.ex-asperis.com' : 'https
 const releaseVersion = beta ? `${packageVersion}-beta` : packageVersion
 
 function manifest() {
-  const name = beta ? 'Outliner+ Beta' : 'Outliner+'
+  const name = beta ? 'Stage Manager Beta' : 'Stage Manager for Owlbear Rodeo'
+  const actionTitle = beta ? 'Stage Manager Beta' : 'Stage Manager'
   return {
     name,
     version: releaseVersion,
@@ -20,7 +21,7 @@ function manifest() {
     background_url: `${publicOrigin}/background.html?v=${releaseVersion}`,
     description: 'Manage layers, search for items, and view an enhanced outline of your scenes',
     action: {
-      title: name,
+      title: actionTitle,
       icon: `${publicOrigin}/icon.svg?v=${releaseVersion}`,
       popover: `${publicOrigin}/extension.html?v=${releaseVersion}`,
       height: 129,

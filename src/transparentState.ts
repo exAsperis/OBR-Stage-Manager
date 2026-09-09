@@ -1,7 +1,7 @@
 import type { Item, Vector2 } from "@owlbear-rodeo/sdk";
 
 // Kept literal so this pure module can run in Node's stripped-TypeScript test mode.
-const ITEM_TRANSPARENCY_METADATA_KEY = "com.ex-asperis.outliner/v1/transparentState";
+const ITEM_TRANSPARENCY_METADATA_KEY = "com.ex-asperis.obr-stage-manager/v1/transparentState";
 
 export type TransparencySource = "direct" | "inherited";
 

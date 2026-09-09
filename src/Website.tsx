@@ -115,7 +115,7 @@ export function Website() {
     <header className="site-header">
       <a className="brand" href="https://www.ex-asperis.com/" aria-label="ex Asperis home">
         <img src="/logo.png" alt="" />
-        <span><strong>Outliner+</strong><small>by ex Asperis</small></span>
+        <span><strong>Stage Manager</strong><small>for Owlbear Rodeo</small></span>
       </a>
       <nav aria-label="Primary navigation">
         <a href="#overview">Overview</a>
@@ -126,7 +126,7 @@ export function Website() {
 
     <main>
       <section className="hero">
-        <img className="hero-art" src={hero} alt="Outliner+ organizing artwork into virtual layers in Owlbear Rodeo" />
+        <img className="hero-art" src={hero} alt="Stage Manager organizing artwork into virtual layers in Owlbear Rodeo" />
         <div className="hero-copy">
           <p className="eyebrow">Owlbear Rodeo extension</p>
           <h1>Keep every Scene<br />in perfect order.</h1>
@@ -152,13 +152,13 @@ export function Website() {
         <article className="guide">
           <MarkdownGuide source={instructions} />
           <figure className="context-figure">
-            <img src={contextMenu} alt="The Outliner+ Send submenu in Owlbear Rodeo's item context menu" />
+            <img src={contextMenu} alt="The Stage Manager Send submenu in Owlbear Rodeo's item context menu" />
             <figcaption>The Send submenu in Owlbear Rodeo’s item context menu.</figcaption>
           </figure>
         </article>
       </section>
     </main>
 
-    <footer><span>Outliner+ by ex Asperis</span><a href="https://github.com/exAsperis/OBR-Outliner-plus">Source on GitHub</a></footer>
+    <footer><span>Stage Manager for Owlbear Rodeo by ex Asperis</span><a href="https://github.com/exAsperis/OBR-Outliner-plus">Source on GitHub</a></footer>
   </div>;
 }
