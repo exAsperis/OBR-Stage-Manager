@@ -1,16 +1,16 @@
 {
   "name": "Stage Manager for Owlbear Rodeo",
-  "version": "1.0.3",
+  "version": "1.0.2",
   "manifest_version": 1,
   "author": "es Asperis",
   "homepage_url": "https://github.com/exAsperis/OBR-Stage-Manager",
-  "icon": "https://obr-stage-manager.ex-asperis.com/logo.png?v=1.0.3",
-  "background_url": "https://obr-stage-manager.ex-asperis.com/background.html?v=1.0.3",
+  "icon": "https://obr-stage-manager.ex-asperis.com/logo.png?v=1.0.2",
+  "background_url": "https://obr-stage-manager.ex-asperis.com/background.html?v=1.0.2",
   "description": "Manage layers, search for items, and view an enhanced outline of your scenes",
   "action": {
     "title": "Stage Manager",
-    "icon": "https://obr-stage-manager.ex-asperis.com/icon.svg?v=1.0.3",
-    "popover": "https://obr-stage-manager.ex-asperis.com/extension.html?v=1.0.3",
+    "icon": "https://obr-stage-manager.ex-asperis.com/icon.svg?v=1.0.2",
+    "popover": "https://obr-stage-manager.ex-asperis.com/extension.html?v=1.0.2",
     "height": 129,
     "width": 375
   }

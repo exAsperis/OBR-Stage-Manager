@@ -15,7 +15,7 @@ import PreviousVerticalIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import NextVerticalIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import RestoreIcon from "@mui/icons-material/OpenInFullRounded";
 import MinimizeIcon from "@mui/icons-material/CloseFullscreenRounded";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useOwlbearStore } from "./useOwlbearStore";
 import { moveStatefulVirtualLayerState, setStatefulVirtualLayerSelection } from "./virtualLayerService";
 import { resolveParticipationModel, type ResolvedStateGroup } from "./participation";
@@ -34,6 +34,68 @@ function StateButton({ group, state, active, suppressed, disabled, vertical, onA
 }
 
 const iconButtonSx = { width: 40, height: 40, p: 0, "& .MuiSvgIcon-root": { width: 24, height: 24 } } as const;
+
+function StateGroupLabel({ label, suppressed }: { label: string; suppressed: boolean }) {
+  const segments = label.split("/");
+  const slashCount = segments.length - 1;
+  const [breakCount, setBreakCount] = useState(slashCount ? 1 : 0);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const lineRefs = useRef<Array<HTMLSpanElement | null>>([]);
+
+  useLayoutEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    const measure = () => {
+      setAvailableWidth(element.clientWidth);
+      setBreakCount(slashCount ? 1 : 0);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [slashCount]);
+
+  useLayoutEffect(() => {
+    if (!availableWidth) return;
+    const overflow = lineRefs.current.some((line) => line && line.scrollWidth > line.clientWidth);
+    if (overflow && breakCount < slashCount) {
+      setBreakCount((count) => count + 1);
+      return;
+    }
+    setTruncated(overflow);
+  }, [availableWidth, breakCount, label, slashCount]);
+
+  useLayoutEffect(() => {
+    setBreakCount(slashCount ? 1 : 0);
+  }, [label, slashCount]);
+
+  const firstLineEnd = segments.length - breakCount;
+  const lines = slashCount
+    ? [segments.slice(0, firstLineEnd).join("/"), ...segments.slice(firstLineEnd)]
+    : segments;
+  lineRefs.current = [];
+  return <Tooltip title={truncated ? label : ""} disableInteractive>
+    <Typography
+      ref={containerRef}
+      component="span"
+      variant="caption"
+      color={suppressed ? "warning.main" : undefined}
+      fontWeight={700}
+      sx={{ display: "block", minWidth: 0, overflow: "hidden", lineHeight: 1.05 }}
+    >
+      {lines.map((line, index) => <Box
+        key={index}
+        ref={(element: HTMLSpanElement | null) => { lineRefs.current[index] = element; }}
+        component="span"
+        sx={{ display: "block", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+      >
+        {index > 1 && "　".repeat(index - 1)}{index > 0 && "↳"}{line}{index < lines.length - 1 && "/"}
+      </Box>)}
+    </Typography>
+  </Tooltip>;
+}
 
 function StateGroupRow({ group, label, guardianParticipating, switching, activate, hideAll, orientation }: { group: ResolvedStateGroup; label: string; guardianParticipating: boolean; switching: boolean; activate: (state: StatefulLayer) => void; hideAll: () => void; orientation: MinimizedOrientation }) {
   const virtualLayers = useOwlbearStore((state) => state.virtualLayers);
@@ -58,14 +120,14 @@ function StateGroupRow({ group, label, guardianParticipating, switching, activat
 
   const vertical = orientation === "vertical";
   return <Box sx={{ display: "contents" }}>
-    <Box sx={{ width: "100%", minWidth: 0, overflow: "hidden", textAlign: vertical ? "center" : undefined, alignSelf: "center" }} title={label}>
-      <Typography variant="caption" color={guardianParticipating ? undefined : "warning.main"} fontWeight={700} display="block" noWrap textOverflow="ellipsis" overflow="hidden">{label}</Typography>
+    <Box sx={{ width: "100%", minWidth: 0, overflow: "hidden", textAlign: vertical ? "center" : undefined, alignSelf: "center" }}>
+      <StateGroupLabel label={label} suppressed={!guardianParticipating} />
     </Box>
     <Tooltip title={`Suppress all ${label} states`}><span><IconButton sx={iconButtonSx} color={allStatesSuppressed ? "primary" : "default"} disabled={switching} aria-label={`Suppress all ${label} states`} aria-pressed={allStatesSuppressed} onClick={hideAll}><HideAllStatesIcon /></IconButton></span></Tooltip>
     <Tooltip title={`Previous ${label} state`}><span><IconButton sx={iconButtonSx} disabled={switching || group.states.length < 2} aria-label={`Previous ${label} state`} onClick={() => step(-1)}>{vertical ? <PreviousVerticalIcon /> : <PreviousIcon />}</IconButton></span></Tooltip>
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => { dragging.current = true; }} onDragCancel={() => { dragging.current = false; }} onDragEnd={dragEnd}>
       <SortableContext items={ids} strategy={vertical ? verticalListSortingStrategy : rectSortingStrategy}>
-        <Stack direction={vertical ? "column" : "row"} alignItems="center" sx={{ minWidth: 0, width: vertical ? "100%" : undefined, flexWrap: "nowrap", gap: 0 }}>
+        <Stack direction={vertical ? "column" : "row"} alignItems="center" justifyContent={vertical ? undefined : "space-evenly"} sx={{ minWidth: 0, width: "100%", flexWrap: "nowrap", gap: 0 }}>
           {group.states.map((state, index) => {
             return <StateButton key={state.name.toLocaleLowerCase()} group={group.id} state={state} active={activeStates[index]} suppressed={!guardianParticipating} disabled={switching} vertical={vertical} onActivate={() => { if (!dragging.current) activate(state); }} />;
           })}
@@ -123,9 +185,10 @@ export function StateSwitcher({ minimized = false, minimizedOrientation = "horiz
       justifyItems: "center",
     } : {
       display: "grid",
-      gridTemplateColumns: "minmax(0, 1fr) 40px 40px max-content 40px",
+      gridTemplateColumns: "minmax(0, 1fr) 40px 40px minmax(max-content, 1fr) 40px",
       rowGap: 0.75,
       alignItems: "center",
+      justifyItems: "center",
       width: "100%",
       minWidth: 0,
     }}>

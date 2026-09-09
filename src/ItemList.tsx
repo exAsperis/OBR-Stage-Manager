@@ -21,7 +21,7 @@ import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import type { Item } from "@owlbear-rodeo/sdk";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ItemListItem } from "./ItemListItem";
 import { LayerIcon } from "./LayerIcon";
 import { SortableItem } from "./SortableItem";
@@ -45,13 +45,67 @@ import { participationDescription, resolveParticipationModel } from "./participa
 
 const NATIVE_LAYER_HEADER_HEIGHT = 40;
 
-function VirtualLayerHeading({ name, itemCount }: { name: string; itemCount: number }) {
-  const path = parseVirtualLayerPath(name);
-  if (!path) return <>{name} [{itemCount}]</>;
-  return <>{path.segments.map((segment, index) => <Fragment key={`${index}-${segment.kind}`}>
+function VirtualLayerName({ segments }: { segments: NonNullable<ReturnType<typeof parseVirtualLayerPath>>["segments"] }) {
+  return <>{segments.map((segment, index) => <Fragment key={`${index}-${segment.kind}`}>
     {index > 0 && "/"}
     {segment.kind === "state" ? <>{segment.group}:{" "}<Box component="span" sx={{ color: "info.main" }}>{segment.state}</Box></> : segment.name}
-  </Fragment>)} [{itemCount}]</>;
+  </Fragment>)}</>;
+}
+
+function VirtualLayerHeading({ name, itemCount, suppressed }: { name: string; itemCount: number; suppressed: boolean }) {
+  const path = parseVirtualLayerPath(name);
+  const slashCount = Math.max(0, (path?.segments.length ?? 1) - 1);
+  const [breakCount, setBreakCount] = useState(slashCount ? 1 : 0);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const lineRefs = useRef<Array<HTMLSpanElement | null>>([]);
+
+  useLayoutEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    const measure = () => {
+      setAvailableWidth(element.clientWidth);
+      setBreakCount(slashCount ? 1 : 0);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [slashCount]);
+
+  useLayoutEffect(() => {
+    if (!availableWidth) return;
+    const overflow = lineRefs.current.some((line) => line && line.scrollWidth > line.clientWidth);
+    if (overflow && breakCount < slashCount) {
+      setBreakCount((count) => count + 1);
+      return;
+    }
+    setTruncated(overflow);
+  }, [availableWidth, breakCount, itemCount, name, slashCount, suppressed]);
+
+  useLayoutEffect(() => {
+    setBreakCount(slashCount ? 1 : 0);
+  }, [name, slashCount]);
+
+  if (!path || !slashCount) return <>{name} [{itemCount}]{suppressed && <Box component="span" sx={{ color: "warning.main" }}> — suppressed</Box>}</>;
+  const firstLineEnd = path.segments.length - breakCount;
+  const lines = [path.segments.slice(0, firstLineEnd), ...path.segments.slice(firstLineEnd).map((segment) => [segment])];
+  const tooltipText = `${name} [${itemCount}]${suppressed ? " — suppressed" : ""}`;
+  lineRefs.current = [];
+  return <Tooltip title={truncated ? tooltipText : ""} disableInteractive>
+    <Box ref={containerRef} component="span" sx={{ display: "block", minWidth: 0, overflow: "hidden", lineHeight: 1.05 }}>
+      {lines.map((segments, index) => <Box
+        key={index}
+        ref={(element: HTMLSpanElement | null) => { lineRefs.current[index] = element; }}
+        component="span"
+        sx={{ display: "block", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+      >
+        {index > 1 && "　".repeat(index - 1)}{index > 0 && "↳"}<VirtualLayerName segments={segments} />{index < lines.length - 1 && "/"}
+        {index === lines.length - 1 && <> [{itemCount}]{suppressed && <Box component="span" sx={{ color: "warning.main" }}> — suppressed</Box>}</>}
+      </Box>)}
+    </Box>
+  </Tooltip>;
 }
 
 interface Props {
@@ -122,9 +176,12 @@ function Group({ definition, items, role, searching, groupDropPosition, onRename
   const unassigned = definition.id === UNASSIGNED_ID;
   const groupHeading = `${definition.name} [${items.length}]`;
   const showNonStateActions = hovering || focusWithin || sendMenuOpen;
-  const row = <ListItemButton dense onClick={() => setOpen(!open)} aria-expanded={open} onPointerOver={(event) => { if (event.pointerType === "mouse") setHovering(true); }} onPointerLeave={(event) => { if (event.pointerType === "mouse") setHovering(false); }} onFocus={() => setFocusWithin(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false); }} sx={{ height: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: "background.default", color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
+  const row = <ListItemButton dense onClick={() => setOpen(!open)} aria-expanded={open} onPointerOver={(event) => { if (event.pointerType === "mouse") setHovering(true); }} onPointerLeave={(event) => { if (event.pointerType === "mouse") setHovering(false); }} onFocus={() => setFocusWithin(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false); }} sx={{ minHeight: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: "background.default", color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
     <ListItemIcon sx={{ color: participation && !participation.participating ? "warning.main" : selected ? "primary.main" : "text.secondary", minWidth: "28px", "& svg": { fontSize: 16 } }}><Tooltip title={participation ? participationDescription(participation) : linked ? "Linked virtual layer" : "Virtual layer"}>{linked ? <LinkIcon aria-label="Linked virtual layer" /> : <VirtualLayerIcon aria-label="Virtual layer" />}</Tooltip></ListItemIcon>
-    <ListItemText primary={<OverflowTooltipText text={`${groupHeading}${participation && !participation.participating ? " — suppressed" : ""}`}><VirtualLayerHeading name={definition.name} itemCount={items.length} />{participation && !participation.participating && <Box component="span" sx={{ color: "warning.main" }}> — suppressed</Box>}</OverflowTooltipText>} sx={{ minWidth: 0 }} primaryTypographyProps={{ fontStyle: "italic" }} />
+    <ListItemText primary={unassigned
+      ? <OverflowTooltipText text={groupHeading} />
+      : <VirtualLayerHeading name={definition.name} itemCount={items.length} suppressed={participation?.participating === false} />
+    } sx={{ minWidth: 0, my: 0.5 }} primaryTypographyProps={{ component: "div", fontStyle: "italic" }} />
     {role === "GM" && <Stack direction="row" alignItems="center" flexShrink={0}>
       {showNonStateActions && <>{!unassigned && <><Tooltip title="Edit"><IconButton size="small" onClick={(event) => { event.stopPropagation(); onRename(definition); }}><EditIcon fontSize="small" /></IconButton></Tooltip><Tooltip title="Delete"><IconButton size="small" onClick={(event) => { event.stopPropagation(); onDelete(definition); }}><DeleteIcon fontSize="small" /></IconButton></Tooltip></>}<SendMenuButton itemIds={items.map((item) => item.id)} allowStackWhenEmpty onStack={(operation) => onGroupStack(definition.obrLayer, definition.id, operation)} confirmLayerMove={definition.name} onOpenChange={setSendMenuOpen} /></>}
       <LayerPropertyControls items={items} scope={{ kind: "group", layer: definition.obrLayer, groupId: definition.id }} fog={definition.obrLayer === "FOG"} />
