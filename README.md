@@ -100,19 +100,13 @@ lossily migrating old rules. Recreate a scene's virtual layers in 1.0 after
 installing the new version. See [the 1.0 compatibility notes](docs/1.0-compatibility.md)
 for the precise behavior.
 
-## Azure Static Web Apps
+## GitHub Pages
 
-The included GitHub Actions workflow deploys the Vite build from `main`. Add the
-Azure deployment token to the GitHub repository as the
-`AZURE_STATIC_WEB_APPS_API_TOKEN` Actions secret before running the workflow.
+The included GitHub Actions workflow tests and builds pushes to `main`, then
+publishes `dist` to GitHub Pages. The `public/CNAME` file configures the custom
+domain `obr-stage-manager.ex-asperis.com`.
 
-Pushes to `beta` deploy to Azure's stable `beta` environment. The Vite build
-generates environment-specific manifests automatically: production assets use
-`https://obr-stage-manager.ex-asperis.com`, while beta assets use
-`https://outliner-plus-beta.ex-asperis.com` and the `Stage Manager Beta` identity.
-
-After Azure assigns the production hostname, use its absolute manifest URL when
-installing the extension in Owlbear Rodeo, for example:
+Use the absolute manifest URL when installing the extension in Owlbear Rodeo:
 
 ```text
 https://obr-stage-manager.ex-asperis.com/manifest.json
