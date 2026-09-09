@@ -94,6 +94,9 @@ export function Outliner() {
     layoutRef.current = next;
     setLayout(next);
     writeOutlinerLayoutSettings(next);
+    const dimensions = sceneLayoutRef.current.dimensions[minimizedOrientation];
+    void OBR.action.setWidth(dimensions.width);
+    void OBR.action.setHeight(dimensions.height);
   };
 
   useEffect(() => {

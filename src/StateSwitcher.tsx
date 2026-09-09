@@ -23,10 +23,10 @@ import type { MinimizedOrientation } from "./outlinerLayout";
 
 type StatefulLayer = ResolvedStateGroup["states"][number];
 
-function StateButton({ group, state, active, suppressed, disabled, onActivate }: { group: string; state: StatefulLayer; active: boolean; suppressed: boolean; disabled: boolean; onActivate: () => void }) {
+function StateButton({ group, state, active, suppressed, disabled, vertical, onActivate }: { group: string; state: StatefulLayer; active: boolean; suppressed: boolean; disabled: boolean; vertical: boolean; onActivate: () => void }) {
   const id = `${group.toLocaleLowerCase()}\u0000${state.name.toLocaleLowerCase()}`;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, data: { group, state: state.name } });
-  return <Box ref={setNodeRef} sx={{ minWidth: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 1 : undefined }}>
+  return <Box ref={setNodeRef} sx={{ minWidth: 40, width: vertical ? "100%" : undefined, height: 40, display: "flex", alignItems: "center", justifyContent: "center", transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 1 : undefined }}>
     <Button {...attributes} {...listeners} size="small" color={active ? suppressed ? "warning" : "primary" : "inherit"} variant={active && !suppressed ? "contained" : "outlined"} disabled={disabled} aria-pressed={active} title={active && suppressed ? "Selected locally; guardian is not participating" : undefined} onClick={onActivate} sx={{ minWidth: 0, maxWidth: "100%", height: 24, minHeight: 24, py: 0, px: 1, whiteSpace: "normal", textTransform: "none", cursor: isDragging ? "grabbing" : "grab" }}>
       {state.name}
     </Button>
@@ -57,24 +57,24 @@ function StateGroupRow({ group, label, guardianParticipating, switching, activat
   };
 
   const vertical = orientation === "vertical";
-  return <Stack direction={vertical ? "column" : "row"} alignItems="center" spacing={0} sx={{ minWidth: 0, flexShrink: 0 }}>
-    <Box sx={{ minWidth: vertical ? 0 : 92, maxWidth: 180, textAlign: vertical ? "center" : undefined }} title={label}>
-      <Typography variant="caption" fontWeight={700} noWrap>{label}</Typography>
-      {!guardianParticipating && <Typography variant="caption" color="warning.main" display="block" noWrap>guardian suppressed</Typography>}
+  return <Box sx={{ display: "contents" }}>
+    <Box sx={{ width: "100%", minWidth: 0, overflow: "hidden", textAlign: vertical ? "center" : undefined, alignSelf: "center" }} title={label}>
+      <Typography variant="caption" fontWeight={700} display="block" noWrap textOverflow="ellipsis" overflow="hidden">{label}</Typography>
+      {!guardianParticipating && <Typography variant="caption" color="warning.main" display="block" noWrap textOverflow="ellipsis" overflow="hidden">guardian suppressed</Typography>}
     </Box>
     <Tooltip title={`Suppress all ${label} states`}><span><IconButton sx={iconButtonSx} color={allStatesSuppressed ? "primary" : "default"} disabled={switching} aria-label={`Suppress all ${label} states`} aria-pressed={allStatesSuppressed} onClick={hideAll}><HideAllStatesIcon /></IconButton></span></Tooltip>
     <Tooltip title={`Previous ${label} state`}><span><IconButton sx={iconButtonSx} disabled={switching || group.states.length < 2} aria-label={`Previous ${label} state`} onClick={() => step(-1)}>{vertical ? <PreviousVerticalIcon /> : <PreviousIcon />}</IconButton></span></Tooltip>
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={() => { dragging.current = true; }} onDragCancel={() => { dragging.current = false; }} onDragEnd={dragEnd}>
       <SortableContext items={ids} strategy={vertical ? verticalListSortingStrategy : rectSortingStrategy}>
-        <Stack direction={vertical ? "column" : "row"} alignItems="center" sx={{ minWidth: 0, flex: vertical ? undefined : 1, flexWrap: vertical ? "nowrap" : "wrap", gap: 0 }}>
+        <Stack direction={vertical ? "column" : "row"} alignItems="center" sx={{ minWidth: 0, width: vertical ? "100%" : undefined, flexWrap: "nowrap", gap: 0 }}>
           {group.states.map((state, index) => {
-            return <StateButton key={state.name.toLocaleLowerCase()} group={group.id} state={state} active={activeStates[index]} suppressed={!guardianParticipating} disabled={switching} onActivate={() => { if (!dragging.current) activate(state); }} />;
+            return <StateButton key={state.name.toLocaleLowerCase()} group={group.id} state={state} active={activeStates[index]} suppressed={!guardianParticipating} disabled={switching} vertical={vertical} onActivate={() => { if (!dragging.current) activate(state); }} />;
           })}
         </Stack>
       </SortableContext>
     </DndContext>
     <Tooltip title={`Next ${label} state`}><span><IconButton sx={iconButtonSx} disabled={switching || group.states.length < 2} aria-label={`Next ${label} state`} onClick={() => step(1)}>{vertical ? <NextVerticalIcon /> : <NextIcon />}</IconButton></span></Tooltip>
-  </Stack>;
+  </Box>;
 }
 
 function LayoutOrientationIcon() {
@@ -114,13 +114,28 @@ export function StateSwitcher({ minimized = false, minimizedOrientation = "horiz
       {minimized && <Tooltip title={`Use ${minimizedOrientation === "horizontal" ? "vertical" : "horizontal"} minified layout`}><IconButton sx={iconButtonSx} aria-label={`Use ${minimizedOrientation === "horizontal" ? "vertical" : "horizontal"} minified layout`} onClick={onOrientationToggle}><LayoutOrientationIcon /></IconButton></Tooltip>}
       <Tooltip title={minimized ? "Restore Stage Manager" : "Minimize to scene states"}><IconButton sx={iconButtonSx} aria-label={minimized ? "Restore Stage Manager" : "Minimize to scene states"} onClick={onModeToggle}>{minimized ? <RestoreIcon /> : <MinimizeIcon />}</IconButton></Tooltip>
     </Stack>
-    <Stack direction={vertical ? "row" : "column"} spacing={0.75} alignItems={vertical ? "flex-start" : undefined}>
+    <Box sx={vertical ? {
+      display: "grid",
+      gridAutoFlow: "column",
+      gridTemplateRows: "40px 40px 40px max-content 40px",
+      gridAutoColumns: "120px",
+      columnGap: 0.75,
+      alignItems: "center",
+      justifyItems: "center",
+    } : {
+      display: "grid",
+      gridTemplateColumns: "minmax(0, 1fr) 40px 40px max-content 40px",
+      rowGap: 0.75,
+      alignItems: "center",
+      width: "100%",
+      minWidth: 0,
+    }}>
       {groups.map((group) => {
         const guardian = group.guardianId ? model.logicalLayers.find((layer) => layer.id === group.guardianId) : undefined;
         const guardianParticipation = group.guardianId ? model.byLogicalId.get(group.guardianId) : undefined;
         const label = guardian ? `${guardian.name}/${group.name}` : group.name;
         return <StateGroupRow key={group.id} group={group} label={label} guardianParticipating={!group.guardianId || guardianParticipation?.participating === true} switching={switching} activate={(state) => void activate(group.id, state)} hideAll={() => void hideAll(group)} orientation={vertical ? "vertical" : "horizontal"} />;
       })}
-    </Stack>
+    </Box>
   </Stack>;
 }
