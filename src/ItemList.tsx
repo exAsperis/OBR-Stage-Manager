@@ -21,7 +21,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Tooltip from "@mui/material/Tooltip";
 import type { Item } from "@owlbear-rodeo/sdk";
-import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ItemListItem } from "./ItemListItem";
 import { LayerIcon } from "./LayerIcon";
 import { SortableItem } from "./SortableItem";
@@ -42,7 +42,7 @@ import { InheritanceMenu } from "./InheritanceMenu";
 import { getInheritanceBoundary, inheritanceBoundaryDescription } from "./inheritanceBoundary";
 import { useLayerDisplaySettings } from "./layerSettings";
 import { participationDescription, resolveParticipationModel } from "./participation";
-import { HierarchyActionRow, type HierarchyAction } from "./HierarchyActions";
+import { HierarchyActionRow, type HierarchyAction, type HierarchyActionContext } from "./HierarchyActions";
 import { useHierarchyActionLayout } from "./hierarchyActionContext";
 
 const NATIVE_LAYER_HEADER_HEIGHT = 40;
@@ -135,6 +135,7 @@ interface Props {
 export function ItemList(props: Props) {
   const { labelWidth } = useHierarchyActionLayout();
   const [open, setOpen] = useState(false);
+  const [actionContextOpen, setActionContextOpen] = useState(false);
   const { layer, definitions, items, nativeItems, groupOrder } = props;
   const selected = useOwlbearStore((state) => items.some((item) => state.selection?.includes(item.id)));
   const layerName = `${capitalize(layer)}${layer !== "FOG" && layer !== "TEXT" ? "s" : ""}`;
@@ -148,10 +149,10 @@ export function ItemList(props: Props) {
     </SortableItem>
   ));
   return <Box component="section" sx={{ position: "relative" }}>
-    <ListItemButton dense onClick={() => setOpen(!open)} divider aria-expanded={open} sx={{ position: "sticky", top: 0, zIndex: 3, minHeight: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: "background.paper", color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
+    <ListItemButton dense onClick={() => setOpen(!open)} divider aria-expanded={open} sx={{ position: "sticky", top: 0, zIndex: 3, minHeight: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: actionContextOpen ? "action.hover" : "background.paper", boxShadow: actionContextOpen ? (theme) => `inset 0 0 0 2px ${theme.palette.info.main}` : undefined, color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
       <ListItemIcon sx={{ color: selected ? "primary.main" : "text.secondary", minWidth: "28px", "& svg": { fontSize: "1.25rem" } }}><LayerIcon layer={layer} /></ListItemIcon>
       <ListItemText primary={<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}><Box sx={{ minWidth: 0, flex: 1 }}><OverflowTooltipText text={layerHeading} /></Box>{props.role === "GM" && !props.searching && <Tooltip title="Create virtual layer" placement="left"><IconButton size="small" aria-label={`Create virtual layer in ${layerName}`} onClick={(event) => { event.stopPropagation(); props.onCreate(); }}><AddIcon fontSize="small" /></IconButton></Tooltip>}</Box>} sx={{ minWidth: 0, flex: `1 1 ${labelWidth}px` }} />
-      {props.role === "GM" ? <LayerPropertyControls items={nativeItems} scope={{ kind: "native", layer }} fog={layer === "FOG"} /> : <HierarchyActionRow actions={[]} />}
+      {props.role === "GM" ? <LayerPropertyControls items={nativeItems} scope={{ kind: "native", layer }} fog={layer === "FOG"} context={{ label: layerHeading, icon: <LayerIcon layer={layer} /> }} onMenuOpenChange={setActionContextOpen} /> : <HierarchyActionRow actions={[]} />}
     </ListItemButton>
     <Collapse in={open} unmountOnExit><List component="div" dense disablePadding>
       {definitions.length === 0 ? <><SortableItem itemId={`START:${layer}:${UNASSIGNED_ID}`} disabled={props.searching} data={{ kind: "start", nativeLayer: layer, groupId: UNASSIGNED_ID }} />{renderItems(items)}</> : <>
@@ -170,6 +171,7 @@ function Group({ definition, items, role, searching, groupDropPosition, onRename
   const { labelWidth } = useHierarchyActionLayout();
   const [open, setOpen] = useState(false);
   const [sendAnchor, setSendAnchor] = useState<HTMLElement | null>(null);
+  const [propertyMenuOpen, setPropertyMenuOpen] = useState(false);
   const selected = useOwlbearStore((state) => items.some((item) => state.selection?.includes(item.id)));
   const virtualLayers = useOwlbearStore((state) => state.virtualLayers);
   const model = useMemo(() => resolveParticipationModel(virtualLayers), [virtualLayers]);
@@ -177,17 +179,19 @@ function Group({ definition, items, role, searching, groupDropPosition, onRename
   const participation = model.byDefinitionId.get(definition.id);
   const unassigned = definition.id === UNASSIGNED_ID;
   const groupHeading = `${definition.name} [${items.length}]`;
+  const contextIcon = linked ? <LinkIcon /> : <VirtualLayerIcon />;
+  const actionContextOpen = propertyMenuOpen || Boolean(sendAnchor);
   const leadingActions: HierarchyAction[] = [
     ...(!unassigned ? [{ id: "rename", label: "Rename", icon: <EditIcon fontSize="small" />, onSelect: () => onRename(definition) }, { id: "delete", label: "Delete", icon: <DeleteIcon fontSize="small" />, onSelect: () => onDelete(definition) }] : []),
     { id: "send", label: "Send", icon: <SendIcon fontSize="small" />, onSelect: (anchor) => setSendAnchor(anchor) },
   ];
-  const row = <ListItemButton dense onClick={() => setOpen(!open)} aria-expanded={open} sx={{ minHeight: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: "background.default", color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
+  const row = <ListItemButton dense onClick={() => setOpen(!open)} aria-expanded={open} sx={{ minHeight: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: actionContextOpen ? "action.hover" : "background.default", boxShadow: actionContextOpen ? (theme) => `inset 0 0 0 2px ${theme.palette.info.main}` : undefined, color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
     <ListItemIcon sx={{ color: participation && !participation.participating ? "warning.main" : selected ? "primary.main" : "text.secondary", minWidth: "28px", "& svg": { fontSize: 16 } }}><Tooltip title={participation ? participationDescription(participation) : linked ? "Linked virtual layer" : "Virtual layer"}>{linked ? <LinkIcon aria-label="Linked virtual layer" /> : <VirtualLayerIcon aria-label="Virtual layer" />}</Tooltip></ListItemIcon>
     <ListItemText primary={unassigned
       ? <OverflowTooltipText text={groupHeading} />
       : <VirtualLayerHeading name={definition.name} itemCount={items.length} suppressed={participation?.participating === false} />
     } sx={{ minWidth: 0, flex: `1 1 ${labelWidth}px`, my: 0.5 }} primaryTypographyProps={{ component: "div", fontStyle: "italic" }} />
-    {role === "GM" ? <><LayerPropertyControls leadingActions={leadingActions} items={items} scope={{ kind: "group", layer: definition.obrLayer, groupId: definition.id }} fog={definition.obrLayer === "FOG"} /><SendMenuButton hideButton externalAnchor={sendAnchor} itemIds={items.map((item) => item.id)} allowStackWhenEmpty onStack={(operation) => onGroupStack(definition.obrLayer, definition.id, operation)} confirmLayerMove={definition.name} onOpenChange={(open) => { if (!open) setSendAnchor(null); }} /></> : <HierarchyActionRow actions={[]} />}
+    {role === "GM" ? <><LayerPropertyControls leadingActions={leadingActions} items={items} scope={{ kind: "group", layer: definition.obrLayer, groupId: definition.id }} fog={definition.obrLayer === "FOG"} context={{ label: definition.name, icon: contextIcon }} onMenuOpenChange={setPropertyMenuOpen} /><SendMenuButton hideButton externalAnchor={sendAnchor} itemIds={items.map((item) => item.id)} allowStackWhenEmpty onStack={(operation) => onGroupStack(definition.obrLayer, definition.id, operation)} confirmLayerMove={definition.name} onOpenChange={(open) => { if (!open) setSendAnchor(null); }} /></> : <HierarchyActionRow actions={[]} />}
   </ListItemButton>;
   return <>
     <SortableItem itemId={unassigned ? `UG:${definition.obrLayer}` : `VL:${definition.id}`} disabled={searching} data={{ kind: "group", nativeLayer: definition.obrLayer, groupId: definition.id }} stickyTop={NATIVE_LAYER_HEADER_HEIGHT} indicatorPosition={groupDropPosition}>{row}</SortableItem>
@@ -195,10 +199,13 @@ function Group({ definition, items, role, searching, groupDropPosition, onRename
   </>;
 }
 
-function LayerPropertyControls({ items, scope, fog = false, leadingActions = [] }: { items: Item[]; scope: RuleScope; fog?: boolean; leadingActions?: HierarchyAction[] }) {
+function LayerPropertyControls({ items, scope, fog = false, leadingActions = [], context, onMenuOpenChange }: { items: Item[]; scope: RuleScope; fog?: boolean; leadingActions?: HierarchyAction[]; context?: HierarchyActionContext; onMenuOpenChange?: (open: boolean) => void }) {
   const state = useOwlbearStore((store) => store.virtualLayers);
   const features = useLayerDisplaySettings().features;
   const [inheritanceAnchor, setInheritanceAnchor] = useState<HTMLElement | null>(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  useEffect(() => { onMenuOpenChange?.(overflowOpen || Boolean(inheritanceAnchor)); }, [inheritanceAnchor, onMenuOpenChange, overflowOpen]);
+  useEffect(() => () => onMenuOpenChange?.(false), [onMenuOpenChange]);
   const parentRule = scope.kind === "group" ? getNativeRule(state, scope.layer) : {};
   const config = scope.kind === "group" ? getGroupInheritance(state, scope.layer, scope.groupId) : undefined;
   const boundary = scope.kind === "group" ? getInheritanceBoundary(state, scope.groupId) : undefined;
@@ -236,5 +243,5 @@ function LayerPropertyControls({ items, scope, fog = false, leadingActions = [] 
     ...(features.locked ? [{ id: "lock", label: displayed.locked ? "Unlock all" : "Lock all", icon: displayed.locked ? <LockedIcon fontSize="small" /> : <UnlockIcon fontSize="small" />, color: stateColor("locked", mixedLocked), disabled: disabled("locked"), disabledSx: disabledSx("locked"), onSelect: () => { void setProperty("locked", !displayed.locked); } } as HierarchyAction] : []),
     ...(features.visible ? [{ id: "visibility", label: visibilityAction, icon: fog ? displayed.visible ? <FogCutOffIcon fontSize="small" /> : <FogCutOnIcon fontSize="small" /> : displayed.visible ? <VisibleIcon fontSize="small" /> : <HiddenIcon fontSize="small" />, color: stateColor("visible", mixedVisible), disabled: disabled("visible"), disabledSx: disabledSx("visible"), onSelect: () => { void setProperty("visible", !displayed.visible); } } as HierarchyAction] : []),
   ];
-  return <><HierarchyActionRow actions={actions} />{features.manageInheritance && <InheritanceMenu anchorEl={inheritanceAnchor} scope={scope} config={config} enforce={localRule} displayed={displayed} features={features} boundary={boundary} onClose={() => setInheritanceAnchor(null)} />}</>;
+  return <><HierarchyActionRow actions={actions} context={context} onOverflowOpenChange={setOverflowOpen} />{features.manageInheritance && <InheritanceMenu anchorEl={inheritanceAnchor} scope={scope} config={config} enforce={localRule} displayed={displayed} features={features} boundary={boundary} onClose={() => setInheritanceAnchor(null)} />}</>;
 }

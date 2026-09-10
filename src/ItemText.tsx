@@ -1,25 +1,14 @@
 import ListItemText from "@mui/material/ListItemText";
-import { Item, isShape } from "@owlbear-rodeo/sdk";
+import { Item } from "@owlbear-rodeo/sdk";
 import { useMemo } from "react";
 import { useOwlbearStore } from "./useOwlbearStore";
-import { Textable, capitalize, isTextable, toPlainText } from "./helpers";
+import { Textable, isTextable, toPlainText } from "./helpers";
 import { OverflowTooltipText } from "./OverflowTooltipText";
+import { itemDisplayName } from "./itemDisplay";
 
 export function ItemText({ item }: { item: Item }) {
   const role = useOwlbearStore((state) => state.role);
-  const name = useMemo(() => {
-    if (role === "PLAYER") {
-      let name = "Item";
-      if (isShape(item)) {
-        name = capitalize(item.shapeType);
-      } else {
-        name = capitalize(item.type);
-      }
-      return name;
-    } else {
-      return item.name;
-    }
-  }, [item, role]);
+  const name = useMemo(() => itemDisplayName(item, role), [item, role]);
 
   if (isTextable(item)) {
     return <TextableText item={item} name={name} zIndex={item.zIndex} />;

@@ -18,7 +18,7 @@ export function Header({
   return (
     <>
       <CardHeader
-        avatar={title ? <Box component="img" src="/icon-color.svg" alt="" aria-hidden sx={{ width: 24, height: 24 }} /> : undefined}
+        avatar={title ? <Box sx={{ position: "relative", width: 24, height: 24 }}><Box component="img" src="/icon-color.svg" alt="" aria-hidden sx={{ position: "absolute", width: 40, height: 40, left: -8, top: -8 }} /></Box> : undefined}
         title={title && <>{title}{" "}<Typography component="span" variant="caption" color="text.secondary">v{packageJson.version}</Typography></>}
         action={action}
         sx={{ bgcolor: "background.paper" }}
