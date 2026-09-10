@@ -1,16 +1,35 @@
-import { createSvgIcon } from "@mui/material/utils";
+import Box from "@mui/material/Box";
+import packageJson from "../../../package.json";
 
-const Rays = () => <path
-  d="M12 3.2v2.1m5.45-.75-1.2 1.75m4.55 3.05-2.05.65m1.1 5.65-1.95-.65m-.45 4.45-1.25-1.7M12 20.8v-2.1m-5.45.75 1.2-1.75M3.2 14.65l2.05-.65m-1.1-5.65 1.95.65m.45-4.45L7.8 6.3"
-  fill="none"
-  stroke="currentColor"
-  strokeWidth="1.8"
-  strokeLinecap="round"
-/>;
+type StageIconProps = {
+  fontSize?: "inherit" | "small" | "medium" | "large";
+};
 
-export const TransparentIcon = createSvgIcon(<Rays />, "Transparent");
+const fontSizes = { inherit: "inherit", small: 20, medium: 24, large: 35 } as const;
 
-export const OpaqueIcon = createSvgIcon(
-  <circle cx="12" cy="12" r="5.5" fill="currentColor" />,
-  "Opaque",
-);
+function StageIcon({ file, label, fontSize = "medium" }: StageIconProps & { file: string; label: string }) {
+  const url = `/${file}.svg?v=${packageJson.version}`;
+  return <Box
+    component="span"
+    role="img"
+    aria-label={label}
+    sx={{
+      display: "inline-block",
+      flexShrink: 0,
+      width: "1em",
+      height: "1em",
+      fontSize: fontSizes[fontSize],
+      bgcolor: "currentColor",
+      mask: `url("${url}") center / contain no-repeat`,
+      WebkitMask: `url("${url}") center / contain no-repeat`,
+    }}
+  />;
+}
+
+export function OnStageIcon(props: StageIconProps) {
+  return <StageIcon {...props} file="on-stage" label="On stage" />;
+}
+
+export function OffStageIcon(props: StageIconProps) {
+  return <StageIcon {...props} file="off-stage" label="Off stage" />;
+}

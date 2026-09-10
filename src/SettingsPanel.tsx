@@ -12,7 +12,7 @@ import { useOwlbearStore } from "./useOwlbearStore";
 
 const FEATURES: Array<{ feature: FeatureSetting; label: string }> = [
   { feature: "manageInheritance", label: "Manage inheritance" },
-  { feature: "transparency", label: "Transparency" },
+  { feature: "transparency", label: "On-stage / off-stage" },
   { feature: "interaction", label: "Interaction" },
   { feature: "locked", label: "Locked/Unlocked" },
   { feature: "visible", label: "Visible/Hidden" },

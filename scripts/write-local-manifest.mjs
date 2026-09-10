@@ -10,10 +10,10 @@ const manifest = {
   name: "Stage Manager (Local)",
   version: localVersion,
   manifest_version: 1,
-  author: "es Asperis",
+  author: "ex Asperis",
   icon: `${origin}/icon-color.svg`,
   background_url: `${origin}/background.html`,
-  description: "Local development build of Stage Manager",
+  description: "Set the stage. Create, link, and control virtual layers for multi-state rooms, multi-floor maps, and other advanced effects.",
   action: {
     title: "Stage Manager (Local)",
     icon: `${origin}/icon-bw.svg`,

@@ -1,0 +1,17 @@
+{
+  "name": "Stage Manager",
+  "version": "1.0.7",
+  "manifest_version": 1,
+  "author": "ex Asperis",
+  "homepage_url": "https://github.com/exAsperis/OBR-Stage-Manager",
+  "icon": "https://obr-stage-manager.ex-asperis.com/icon-color.svg?v=1.0.7",
+  "background_url": "https://obr-stage-manager.ex-asperis.com/background.html?v=1.0.7",
+  "description": "Set the stage for your scene. Create, link, and dynamically control virtual layers to produce advanced effects like multi-state rooms or multi-floor maps.",
+  "action": {
+    "title": "Stage Manager",
+    "icon": "https://obr-stage-manager.ex-asperis.com/icon-bw.svg?v=1.0.7",
+    "popover": "https://obr-stage-manager.ex-asperis.com/extension.html?v=1.0.7",
+    "height": 129,
+    "width": 375
+  }
+}

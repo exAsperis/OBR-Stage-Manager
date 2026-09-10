@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 24 24"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="on-stage.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="22.627417"
+     inkscape:cx="10.120466"
+     inkscape:cy="14.694563"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <circle
+     style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+     id="path1"
+     cx="12"
+     cy="4.053926"
+     r="3.0631971" />
+  <rect
+     style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+     id="rect1"
+     width="6.1429901"
+     height="14.71666"
+     x="8.9285049"
+     y="8.5294762"
+     ry="3.1156893" />
+  <rect
+     style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+     id="rect2"
+     width="1.3700194"
+     height="7.6455922"
+     x="-7.3073483"
+     y="5.518177"
+     ry="0.68500972"
+     inkscape:transform-center-x="3.2385588"
+     inkscape:transform-center-y="-1.4190454"
+     transform="rotate(-67.054479)" />
+  <rect
+     style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+     id="rect3"
+     width="1.3700194"
+     height="7.6455922"
+     x="-1.7834127"
+     y="-25.412182"
+     ry="0.68500972"
+     inkscape:transform-center-x="-2.6320215"
+     inkscape:transform-center-y="2.3610192"
+     transform="rotate(131.17711)" />
+</svg>

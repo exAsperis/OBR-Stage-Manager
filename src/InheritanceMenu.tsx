@@ -13,7 +13,7 @@ import type { FeatureSettings } from "./layerSettings";
 import { inheritanceBoundaryDescription, type InheritanceBoundary } from "./inheritanceBoundary";
 
 const PROPERTIES: Array<{ property: StatefulProperty; feature: keyof FeatureSettings; label: string }> = [
-  { property: "transparent", feature: "transparency", label: "Transparent" },
+  { property: "transparent", feature: "transparency", label: "Off-stage" },
   { property: "disableHit", feature: "interaction", label: "Click-through" },
   { property: "locked", feature: "locked", label: "Locked" },
   { property: "visible", feature: "visible", label: "Visible" },

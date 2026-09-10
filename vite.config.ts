@@ -9,17 +9,17 @@ const publicOrigin = beta ? 'https://outliner-plus-beta.ex-asperis.com' : 'https
 const releaseVersion = beta ? `${packageVersion}-beta` : packageVersion
 
 function manifest() {
-  const name = beta ? 'Stage Manager Beta' : 'Stage Manager for Owlbear Rodeo'
+  const name = beta ? 'Stage Manager Beta' : 'Stage Manager'
   const actionTitle = beta ? 'Stage Manager Beta' : 'Stage Manager'
   return {
     name,
     version: releaseVersion,
     manifest_version: 1,
-    author: 'es Asperis',
+    author: 'ex Asperis',
     homepage_url: 'https://github.com/exAsperis/OBR-Stage-Manager',
     icon: `${publicOrigin}/icon-color.svg?v=${releaseVersion}`,
     background_url: `${publicOrigin}/background.html?v=${releaseVersion}`,
-    description: 'Manage layers, search for items, and view an enhanced outline of your scenes',
+    description: 'Set the stage. Create, link, and control virtual layers for multi-state rooms, multi-floor maps, and other advanced effects.',
     action: {
       title: actionTitle,
       icon: `${publicOrigin}/icon-bw.svg?v=${releaseVersion}`,

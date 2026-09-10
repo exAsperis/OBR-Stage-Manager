@@ -21,16 +21,16 @@ has this shape:
 ```json
 {
   "name": "Stage Manager (Local)",
-  "version": "1.0.6-local",
+  "version": "1.1.1-local",
   "manifest_version": 1,
-  "author": "es Asperis",
+  "author": "ex Asperis",
   "icon": "http://localhost:5173/icon-color.svg",
   "background_url": "http://localhost:5173/background.html",
-  "description": "Local development build of Stage Manager",
+  "description": "Set the stage. Create, link, and control virtual layers for multi-state rooms, multi-floor maps, and other advanced effects.",
   "action": {
     "title": "Stage Manager (Local)",
     "icon": "http://localhost:5173/icon-bw.svg",
-    "popover": "http://localhost:5173/extension.html?v=1.0.6-local",
+    "popover": "http://localhost:5173/extension.html?v=1.1.1-local",
     "height": 129,
     "width": 375
   }

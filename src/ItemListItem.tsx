@@ -28,7 +28,7 @@ import { SendMenuButton } from "./SendMenuButton";
 import { getItemParentRule, getItemRule, hasInstructions, itemInheritanceLabel, inheritanceVisualState, itemState, type StatefulProperty } from "./stateInheritance";
 import { setItemTransparency, setItemVisibility, toggleItemInheritance } from "./virtualLayerService";
 import { InheritanceStateIcon } from "./InheritanceStateIcon";
-import { OpaqueIcon, TransparentIcon } from "./icons/other/TransparencyIcons";
+import { OffStageIcon, OnStageIcon } from "./icons/other/TransparencyIcons";
 import { useLayerDisplaySettings } from "./layerSettings";
 
 const ACTION_SLOT_SIZE = 30;
@@ -175,9 +175,9 @@ export const ItemListItem = memo(function ({
               </Tooltip>
             ) : <EmptyActionSlot />)}
             {features.transparency && (actionVisibility.showTransparent ? (
-              <Tooltip title={displayed.transparent ? "Restore item" : "Make transparent"} disableInteractive>
+              <Tooltip title={displayed.transparent ? "Bring on-stage" : "Send off-stage"} disableInteractive>
                 <IconButton
-                  aria-label={displayed.transparent ? "Restore item" : "Make transparent"}
+                  aria-label={displayed.transparent ? "Bring on-stage" : "Send off-stage"}
                   color={stateColor("transparent")}
                   disabled={isInherited("transparent")}
                   sx={disabledInheritedSx("transparent")}
@@ -185,7 +185,7 @@ export const ItemListItem = memo(function ({
                   onPointerDown={stopActionEvent}
                   onClick={(event) => handleActionClick(event, () => handlePropertyClick("transparent"))}
                 >
-                  {displayed.transparent ? <TransparentIcon fontSize="small" /> : <OpaqueIcon fontSize="small" />}
+                  {displayed.transparent ? <OffStageIcon fontSize="small" /> : <OnStageIcon fontSize="small" />}
                 </IconButton>
               </Tooltip>
             ) : <EmptyActionSlot />)}
