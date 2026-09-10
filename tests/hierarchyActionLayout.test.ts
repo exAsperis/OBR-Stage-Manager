@@ -12,6 +12,11 @@ test("adds columns in 30px increments while preserving the 228px name target", (
   assert.equal(hierarchyActionColumns(408), 4);
 });
 
+test("uses the configured label width and editing density", () => {
+  assert.equal(hierarchyActionColumns(408, 168, 30), 6);
+  assert.equal(hierarchyActionColumns(408, 228, 40), 3);
+});
+
 test("caps the shared action grid at the longest hierarchy row", () => {
   assert.equal(hierarchyActionColumns(800), 9);
 });

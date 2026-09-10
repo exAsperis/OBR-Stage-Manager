@@ -1,4 +1,6 @@
 import { createContext, useContext } from "react";
 
-export const HierarchyActionColumnsContext = createContext(1);
-export const useHierarchyActionColumns = () => useContext(HierarchyActionColumnsContext);
+export interface HierarchyActionLayoutValue { columns: number; slotSize: number; labelWidth: number }
+export const HierarchyActionColumnsContext = createContext<HierarchyActionLayoutValue>({ columns: 1, slotSize: 30, labelWidth: 228 });
+export const useHierarchyActionLayout = () => useContext(HierarchyActionColumnsContext);
+export const useHierarchyActionColumns = () => useHierarchyActionLayout().columns;

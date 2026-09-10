@@ -17,7 +17,7 @@ import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import { memo, useState } from "react";
 import { useInView } from "react-intersection-observer";
 import { HierarchyActionRow, type HierarchyAction } from "./HierarchyActions";
-import { useHierarchyActionColumns } from "./hierarchyActionContext";
+import { useHierarchyActionLayout } from "./hierarchyActionContext";
 import { InheritanceStateIcon } from "./InheritanceStateIcon";
 import { ItemIcon } from "./ItemIcon";
 import { ItemText } from "./ItemText";
@@ -49,7 +49,7 @@ export const ItemListItem = memo(function ItemListItem({ item, onClick, onDouble
   const features = useLayerDisplaySettings().features;
   const [ref, inView] = useInView();
   const [sendAnchor, setSendAnchor] = useState<HTMLElement | null>(null);
-  const actionColumns = useHierarchyActionColumns();
+  const { columns: actionColumns, slotSize, labelWidth } = useHierarchyActionLayout();
   const theme = useTheme();
   const hasUpdatePermission = useItemHsaPermission(item, "UPDATE");
   const hasDeletePermission = useItemHsaPermission(item, "DELETE");
@@ -80,9 +80,9 @@ export const ItemListItem = memo(function ItemListItem({ item, onClick, onDouble
     ...(features.locked && hasUpdatePermission ? [{ id: "lock", label: displayed.locked ? "Unlock" : "Lock", icon: displayed.locked ? <LockRounded fontSize="small" /> : <LockOpenRounded fontSize="small" />, color: inherited("locked") ? "warning" : "default", disabled: inherited("locked"), disabledSx: disabledSx("locked"), onSelect: () => propertyAction("locked") } as HierarchyAction] : []),
     ...(features.visible && role === "GM" ? [{ id: "visibility", label: visibilityLabel, icon: displayed.visible ? item.layer === "FOG" ? <FogCutOffIcon fontSize="small" /> : <VisibilityRounded fontSize="small" /> : item.layer === "FOG" ? <FogCutOnIcon fontSize="small" /> : <VisibilityOffRounded fontSize="small" />, color: inherited("visible") ? "warning" : "default", disabled: inherited("visible"), disabledSx: disabledSx("visible"), onSelect: () => propertyAction("visible") } as HierarchyAction] : []),
   ];
-  return <ListItem disablePadding secondaryAction={inView ? <><HierarchyActionRow actions={actions} />{hasUpdatePermission && <SendMenuButton hideButton externalAnchor={sendAnchor} itemIds={ids} onStack={(operation) => onStack?.(ids, operation)} onOpenChange={(open) => { if (!open) setSendAnchor(null); }} />}</> : undefined} sx={{ ".MuiListItemButton-root": { pr: inView ? `${actionColumns * 30 + 22}px` : undefined } }}>
-    <ListItemButton ref={ref} selected={selected} dense onClick={onClick} onDoubleClick={onDoubleClick} sx={{ margin: "4px 8px", borderRadius: "12px", backgroundColor: dragging ? `${theme.palette.primary.main} !important` : "background.default", boxShadow: dragging ? theme.shadows[5] : undefined, color: dragging ? `${theme.palette.primary.contrastText} !important` : selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent", cursor: dragging ? "grabbing" : undefined }}>
-      {inView ? <><ListItemIcon sx={{ opacity: 0.75, minWidth: 28, "& svg": { fontSize: "1.25rem" }, color: "inherit" }}><ItemIcon item={item} /></ListItemIcon><Box sx={{ minWidth: 0, flex: "1 1 228px" }}><ItemText item={item} /></Box></> : <Box height="28px" />}
+  return <ListItem disablePadding secondaryAction={inView ? <><HierarchyActionRow actions={actions} />{hasUpdatePermission && <SendMenuButton hideButton externalAnchor={sendAnchor} itemIds={ids} onStack={(operation) => onStack?.(ids, operation)} onOpenChange={(open) => { if (!open) setSendAnchor(null); }} />}</> : undefined} sx={{ ".MuiListItemButton-root": { pr: inView ? `${actionColumns * slotSize + 22}px` : undefined } }}>
+    <ListItemButton ref={ref} selected={selected} dense onClick={onClick} onDoubleClick={onDoubleClick} sx={{ minHeight: slotSize, margin: "4px 8px", borderRadius: "12px", backgroundColor: dragging ? `${theme.palette.primary.main} !important` : "background.default", boxShadow: dragging ? theme.shadows[5] : undefined, color: dragging ? `${theme.palette.primary.contrastText} !important` : selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent", cursor: dragging ? "grabbing" : undefined }}>
+      {inView ? <><ListItemIcon sx={{ opacity: 0.75, minWidth: 28, "& svg": { fontSize: "1.25rem" }, color: "inherit" }}><ItemIcon item={item} /></ListItemIcon><Box sx={{ minWidth: 0, flex: `1 1 ${labelWidth}px` }}><ItemText item={item} /></Box></> : <Box height="28px" />}
     </ListItemButton>
   </ListItem>;
 });

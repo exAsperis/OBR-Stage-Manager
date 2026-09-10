@@ -1,10 +1,8 @@
-export const HIERARCHY_ACTION_SLOT_SIZE = 30;
-export const HIERARCHY_NAME_TARGET_WIDTH = 228;
 export const HIERARCHY_LEADING_CHROME_WIDTH = 60;
 export const HIERARCHY_MAX_ACTION_COLUMNS = 9;
 
-export function hierarchyActionColumns(width: number) {
-  const fitting = Math.floor((width - HIERARCHY_LEADING_CHROME_WIDTH - HIERARCHY_NAME_TARGET_WIDTH) / HIERARCHY_ACTION_SLOT_SIZE);
+export function hierarchyActionColumns(width: number, labelWidth = 228, slotSize = 30) {
+  const fitting = Math.floor((width - HIERARCHY_LEADING_CHROME_WIDTH - labelWidth) / slotSize);
   return Math.max(1, Math.min(HIERARCHY_MAX_ACTION_COLUMNS, fitting));
 }
 

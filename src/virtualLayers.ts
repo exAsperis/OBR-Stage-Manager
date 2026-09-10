@@ -34,6 +34,7 @@ export interface VirtualLayerState {
   layers: VirtualLayerDefinition[];
   unassignedOrders?: Partial<Record<Item["layer"], number>>;
   stateOrders?: Record<string, string[]>;
+  stateGroupOrder?: string[];
   /** Normalized state name, or null when every state in the group is suppressed. */
   stateSelections?: Record<string, string | null>;
   inheritance?: StateInheritanceRules;
@@ -124,8 +125,13 @@ export function parseVirtualLayerState(value: unknown): VirtualLayerState {
       stateSelections[groupKey] = typeof selection === "string" ? selection.trim().toLocaleLowerCase() : null;
     }
   }
+  const rawStateGroupOrder = (value as { stateGroupOrder?: unknown }).stateGroupOrder;
+  const stateGroupOrder = Array.isArray(rawStateGroupOrder)
+    ? [...new Set(rawStateGroupOrder.filter((entry): entry is string => typeof entry === "string" && Boolean(entry.trim())).map((entry) => entry.trim().toLocaleLowerCase()))]
+    : [];
   return withoutBoundaryInheritance({ version: 3, layers, ...(Object.keys(unassignedOrders).length ? { unassignedOrders } : {}),
     ...(Object.keys(stateOrders).length ? { stateOrders } : {}),
+    ...(stateGroupOrder.length ? { stateGroupOrder } : {}),
     ...(Object.keys(stateSelections).length ? { stateSelections } : {}), ...(inheritance ? { inheritance } : {}) });
 }
 

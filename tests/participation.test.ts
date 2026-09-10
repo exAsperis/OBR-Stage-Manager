@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { participationDescription, reorderResolvedStateGroup, resolveParticipationModel, withStateGroupSelection } from "../src/participation.ts";
+import { participationDescription, reorderResolvedStateGroup, reorderResolvedStateGroups, resolveParticipationModel, withStateGroupSelection } from "../src/participation.ts";
 import type { VirtualLayerDefinition, VirtualLayerState } from "../src/virtualLayers.ts";
 
 const layer = (id: string, name: string, obrLayer: VirtualLayerDefinition["obrLayer"] = "PROP", order = 0): VirtualLayerDefinition =>
@@ -102,4 +102,13 @@ test("reorders a guardian-scoped state group without affecting sibling groups", 
   assert.deepEqual(reordered.stateOrders, { "house: floor 1/lights": ["off", "on"] });
   assert.deepEqual(resolveParticipationModel(reordered).stateGroups.find((group) => group.id === "house: floor 1/lights")
     ?.states.map((state) => state.name), ["off", "on"]);
+});
+
+test("reorders elevator groups and appends groups absent from the saved order", () => {
+  const state = houseState();
+  const groups = resolveParticipationModel(state).stateGroups;
+  const moved = reorderResolvedStateGroups(state, groups[groups.length - 1].id, groups[0].id);
+  assert.deepEqual(resolveParticipationModel(moved).stateGroups.map((group) => group.id), [groups[groups.length - 1].id, ...groups.slice(0, -1).map((group) => group.id)]);
+  const partial = { ...state, stateGroupOrder: [groups[1].id] };
+  assert.deepEqual(resolveParticipationModel(partial).stateGroups.map((group) => group.id), [groups[1].id, ...groups.filter((group) => group.id !== groups[1].id).map((group) => group.id)]);
 });

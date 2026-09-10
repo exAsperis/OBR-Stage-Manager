@@ -26,7 +26,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { StateSwitcher } from "./StateSwitcher";
 import { resolveParticipationModel } from "./participation";
 import { ResizeHandles } from "./ResizeHandles";
-import { clampDimension, DEFAULT_OUTLINER_LAYOUT_SETTINGS, MAX_OUTLINER_HEIGHT, MAX_OUTLINER_WIDTH, readOutlinerLayoutSettings, type MinimizedOrientation, type OutlinerDimensions, type OutlinerLayoutSettings, writeOutlinerLayoutSettings } from "./outlinerLayout";
+import { clampDimension, DEFAULT_OUTLINER_LAYOUT_SETTINGS, MAX_OUTLINER_HEIGHT, MAX_OUTLINER_WIDTH, readOutlinerLayoutSettings, type ControlDensity, type MinimizedOrientation, type OutlinerDimensions, type OutlinerLayoutSettings, writeOutlinerLayoutSettings } from "./outlinerLayout";
 import { MINIMIZED_LAYOUT_METADATA_KEY } from "./constants";
 import { convertOutlinerV1Namespace } from "./virtualLayerService";
 
@@ -78,6 +78,13 @@ export function Outliner() {
   }, [setSceneMinimizedLayout]);
 
   useEffect(() => { sceneLayoutRef.current = sceneMinimizedLayout; }, [sceneMinimizedLayout]);
+
+  const updateLocalLayout = useCallback((changes: Partial<OutlinerLayoutSettings>, persist = true) => {
+    const next = { ...layoutRef.current, ...changes };
+    layoutRef.current = next;
+    setLayout(next);
+    if (persist) writeOutlinerLayoutSettings(next);
+  }, []);
 
   const setMode = (mode: "full" | "minimized") => {
     const next = { ...layoutRef.current, mode };
@@ -257,7 +264,7 @@ export function Outliner() {
           </Stack>
         }
       />}
-      <Box ref={switcherRef} flexShrink={0} sx={{ width: isVerticalMinimized ? "max-content" : undefined }}><StateSwitcher minimized={isMinimized} minimizedOrientation={layout.minimizedOrientation} onModeToggle={() => setMode(isMinimized ? "full" : "minimized")} onOrientationToggle={() => setMinimizedOrientation(layout.minimizedOrientation === "horizontal" ? "vertical" : "horizontal")} /></Box>
+      <Box ref={switcherRef} flexShrink={0} sx={{ width: isVerticalMinimized ? "max-content" : undefined }}><StateSwitcher minimized={isMinimized} minimizedOrientation={layout.minimizedOrientation} density={isMinimized ? layout.controlDensity : layout.editingDensity} collapsed={!isMinimized && layout.editingElevatorCollapsed} onCollapsedChange={(editingElevatorCollapsed) => updateLocalLayout({ editingElevatorCollapsed })} onModeToggle={() => setMode(isMinimized ? "full" : "minimized")} onOrientationToggle={() => setMinimizedOrientation(layout.minimizedOrientation === "horizontal" ? "vertical" : "horizontal")} /></Box>
       {!isMinimized && <SimpleBar style={{ minHeight: 0, flex: 1 }}>
         <List ref={listRef} disablePadding>
           {sceneModelCompatibility === "legacy" && <Alert severity="warning" sx={{ m: 1 }}>
@@ -273,8 +280,8 @@ export function Outliner() {
           {sceneModelCompatibility === "invalid" && <Alert severity="error" sx={{ m: 1 }}>
             This scene's Stage Manager data is invalid, so no virtual-layer, inheritance, or participation rules are being applied.
           </Alert>}
-          {settingsOpen && <SettingsPanel />}
-          <Items search={search} />
+          {settingsOpen && <SettingsPanel editingDensity={layout.editingDensity} controlDensity={layout.controlDensity} onDensityChange={(mode: "editing" | "control", density: ControlDensity) => updateLocalLayout(mode === "editing" ? { editingDensity: density } : { controlDensity: density })} />}
+          <Items search={search} labelWidth={layout.labelWidth} actionSlotSize={layout.editingDensity === "roomy" ? 40 : 30} onLabelWidthChange={(labelWidth, persist) => updateLocalLayout({ labelWidth }, persist)} />
         </List>
       </SimpleBar>}
       <Dialog open={conversionOpen} onClose={() => { if (!converting) setConversionOpen(false); }}>

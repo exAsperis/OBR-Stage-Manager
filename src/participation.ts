@@ -116,7 +116,12 @@ export function resolveParticipationModel(state: VirtualLayerState): ResolvedPar
     const participation = byLogicalId.get(logical.id)!;
     for (const definition of logical.definitions) byDefinitionId.set(definition.id, participation);
   }
-  return { logicalLayers: [...logicalById.values()], stateGroups: [...groups.values()], byDefinitionId, byLogicalId };
+  const groupOrder = state.stateGroupOrder ?? [];
+  const groupPositions = new Map(groupOrder.map((id, index) => [id, index]));
+  const stateGroups = [...groups.values()].map((entry, index) => ({ entry, index }))
+    .sort((a, b) => (groupPositions.get(a.entry.id) ?? groupOrder.length + a.index) - (groupPositions.get(b.entry.id) ?? groupOrder.length + b.index))
+    .map(({ entry }) => entry);
+  return { logicalLayers: [...logicalById.values()], stateGroups, byDefinitionId, byLogicalId };
 }
 
 export function withStateGroupSelection(state: VirtualLayerState, groupId: string, stateName: string | null): VirtualLayerState {
@@ -137,6 +142,15 @@ export function reorderResolvedStateGroup(state: VirtualLayerState, groupId: str
   if (from < 0 || to < 0 || from === to) return state;
   order.splice(to, 0, order.splice(from, 1)[0]);
   return { ...state, stateOrders: { ...state.stateOrders, [group.id]: order } };
+}
+
+export function reorderResolvedStateGroups(state: VirtualLayerState, activeGroupId: string, overGroupId: string): VirtualLayerState {
+  const order = resolveParticipationModel(state).stateGroups.map((group) => group.id);
+  const from = order.indexOf(activeGroupId.trim().toLocaleLowerCase());
+  const to = order.indexOf(overGroupId.trim().toLocaleLowerCase());
+  if (from < 0 || to < 0 || from === to) return state;
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  return { ...state, stateGroupOrder: order };
 }
 
 export function participationDescription(participation: VirtualLayerParticipation) {

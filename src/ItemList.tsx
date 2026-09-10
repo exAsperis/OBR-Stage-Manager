@@ -43,6 +43,7 @@ import { getInheritanceBoundary, inheritanceBoundaryDescription } from "./inheri
 import { useLayerDisplaySettings } from "./layerSettings";
 import { participationDescription, resolveParticipationModel } from "./participation";
 import { HierarchyActionRow, type HierarchyAction } from "./HierarchyActions";
+import { useHierarchyActionLayout } from "./hierarchyActionContext";
 
 const NATIVE_LAYER_HEADER_HEIGHT = 40;
 
@@ -132,6 +133,7 @@ interface Props {
 }
 
 export function ItemList(props: Props) {
+  const { labelWidth } = useHierarchyActionLayout();
   const [open, setOpen] = useState(false);
   const { layer, definitions, items, nativeItems, groupOrder } = props;
   const selected = useOwlbearStore((state) => items.some((item) => state.selection?.includes(item.id)));
@@ -148,7 +150,7 @@ export function ItemList(props: Props) {
   return <Box component="section" sx={{ position: "relative" }}>
     <ListItemButton dense onClick={() => setOpen(!open)} divider aria-expanded={open} sx={{ position: "sticky", top: 0, zIndex: 3, minHeight: `${NATIVE_LAYER_HEADER_HEIGHT}px`, bgcolor: "background.paper", color: selected ? "primary.main" : undefined, borderLeft: "3px solid", borderLeftColor: selected ? "primary.main" : "transparent" }}>
       <ListItemIcon sx={{ color: selected ? "primary.main" : "text.secondary", minWidth: "28px", "& svg": { fontSize: "1.25rem" } }}><LayerIcon layer={layer} /></ListItemIcon>
-      <ListItemText primary={<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}><Box sx={{ minWidth: 0, flex: 1 }}><OverflowTooltipText text={layerHeading} /></Box>{props.role === "GM" && !props.searching && <Tooltip title="Create virtual layer" placement="left"><IconButton size="small" aria-label={`Create virtual layer in ${layerName}`} onClick={(event) => { event.stopPropagation(); props.onCreate(); }}><AddIcon fontSize="small" /></IconButton></Tooltip>}</Box>} sx={{ minWidth: 0, flex: "1 1 228px" }} />
+      <ListItemText primary={<Box sx={{ display: "flex", alignItems: "center", minWidth: 0 }}><Box sx={{ minWidth: 0, flex: 1 }}><OverflowTooltipText text={layerHeading} /></Box>{props.role === "GM" && !props.searching && <Tooltip title="Create virtual layer" placement="left"><IconButton size="small" aria-label={`Create virtual layer in ${layerName}`} onClick={(event) => { event.stopPropagation(); props.onCreate(); }}><AddIcon fontSize="small" /></IconButton></Tooltip>}</Box>} sx={{ minWidth: 0, flex: `1 1 ${labelWidth}px` }} />
       {props.role === "GM" ? <LayerPropertyControls items={nativeItems} scope={{ kind: "native", layer }} fog={layer === "FOG"} /> : <HierarchyActionRow actions={[]} />}
     </ListItemButton>
     <Collapse in={open} unmountOnExit><List component="div" dense disablePadding>
@@ -165,6 +167,7 @@ export function ItemList(props: Props) {
 }
 
 function Group({ definition, items, role, searching, groupDropPosition, onRename, onDelete, onGroupStack, renderItems }: Props & { definition: VirtualLayerDefinition; renderItems: (items: Item[]) => React.ReactNode }) {
+  const { labelWidth } = useHierarchyActionLayout();
   const [open, setOpen] = useState(false);
   const [sendAnchor, setSendAnchor] = useState<HTMLElement | null>(null);
   const selected = useOwlbearStore((state) => items.some((item) => state.selection?.includes(item.id)));
@@ -183,7 +186,7 @@ function Group({ definition, items, role, searching, groupDropPosition, onRename
     <ListItemText primary={unassigned
       ? <OverflowTooltipText text={groupHeading} />
       : <VirtualLayerHeading name={definition.name} itemCount={items.length} suppressed={participation?.participating === false} />
-    } sx={{ minWidth: 0, flex: "1 1 228px", my: 0.5 }} primaryTypographyProps={{ component: "div", fontStyle: "italic" }} />
+    } sx={{ minWidth: 0, flex: `1 1 ${labelWidth}px`, my: 0.5 }} primaryTypographyProps={{ component: "div", fontStyle: "italic" }} />
     {role === "GM" ? <><LayerPropertyControls leadingActions={leadingActions} items={items} scope={{ kind: "group", layer: definition.obrLayer, groupId: definition.id }} fog={definition.obrLayer === "FOG"} /><SendMenuButton hideButton externalAnchor={sendAnchor} itemIds={items.map((item) => item.id)} allowStackWhenEmpty onStack={(operation) => onGroupStack(definition.obrLayer, definition.id, operation)} confirmLayerMove={definition.name} onOpenChange={(open) => { if (!open) setSendAnchor(null); }} /></> : <HierarchyActionRow actions={[]} />}
   </ListItemButton>;
   return <>

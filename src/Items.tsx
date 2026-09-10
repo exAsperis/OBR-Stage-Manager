@@ -16,6 +16,7 @@ import { getOutlinerLayers, OUTLINER_LAYERS_TOP_TO_BOTTOM } from "./layers";
 import { setLayersEnabled, useLayerDisplaySettings } from "./layerSettings";
 import ListItemText from "@mui/material/ListItemText";
 import ListItem from "@mui/material/ListItem";
+import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
@@ -24,16 +25,20 @@ import ShowPopulatedLayersIcon from "@mui/icons-material/LayersRounded";
 import { getVisibleSelectionRange } from "./hierarchySelection";
 import { NameDialog } from "./VirtualLayerNameDialog";
 import { HierarchyActionLayout } from "./HierarchyActions";
+import { clampDimension, MAX_HIERARCHY_LABEL_WIDTH, MIN_HIERARCHY_LABEL_WIDTH } from "./outlinerLayout";
+import { itemHasPermission } from "./hasPermission";
+import { itemDeleteTargets } from "./itemDeleteTargets";
 
 type NameDialogRequest =
   | { mode: "create"; layer: Item["layer"] }
   | { mode: "rename"; definition: VirtualLayerDefinition }
   | { mode: "rename-item"; item: Item };
 
-export function Items({ search }: { search: string }) {
+export function Items({ search, labelWidth, actionSlotSize, onLabelWidthChange }: { search: string; labelWidth: number; actionSlotSize: number; onLabelWidthChange: (width: number, persist: boolean) => void }) {
   const items = useOwlbearStore((state) => state.items);
   const virtualLayers = useOwlbearStore((state) => state.virtualLayers);
   const role = useOwlbearStore((state) => state.role);
+  const permissions = useOwlbearStore((state) => state.permissions);
   const layerSettings = useLayerDisplaySettings();
   const selection = useOwlbearStore((state) => state.selection);
   const searching = Boolean(search);
@@ -138,7 +143,10 @@ export function Items({ search }: { search: string }) {
     else await OBR.scene.items.updateItems([nameDialog.item.id], (items) => { items[0].name = name; });
     setNameDialog(undefined);
   }
-  function deleteItem(item: Item) { void OBR.scene.items.deleteItems([item.id]); }
+  function deleteItem(item: Item) {
+    const ids = itemDeleteTargets(items, selection, item.id, (entry) => itemHasPermission(entry, "DELETE", permissions, role, OBR.player.id));
+    if (ids.length) void OBR.scene.items.deleteItems(ids);
+  }
   function confirmDelete(definition: VirtualLayerDefinition) { if (window.confirm(`Delete virtual layer "${definition.name}"?\nIts objects will become Unassigned. No objects will be deleted.`)) void removeVirtualLayer(definition.id).catch(() => window.alert("Unable to delete the virtual layer.")); }
 
   function dropPositionForEvent(event: DragMoveEvent | DragEndEvent): DropPosition {
@@ -206,12 +214,41 @@ export function Items({ search }: { search: string }) {
   }, [layerSettings.enabledLayers, role, searching, shown]);
   const visibleLayerSet = new Set(shownLayers);
   const sortableIds = [...shownIds, ...virtualLayers.layers.filter((entry) => visibleLayerSet.has(entry.obrLayer)).map((entry) => `VL:${entry.id}`), ...shownLayers.map((layer) => `UG:${layer}`)];
-  return <HierarchyActionLayout><DndContext onDragStart={dragStart} onDragMove={dragMove} onDragEnd={dragEnd} onDragCancel={clearDrag} collisionDetection={collisionDetection} sensors={sensors}>
-    <ListItem divider sx={{ minHeight: 40, px: 2, bgcolor: "background.paper" }}>
+  return <HierarchyActionLayout labelWidth={labelWidth} slotSize={actionSlotSize}><DndContext onDragStart={dragStart} onDragMove={dragMove} onDragEnd={dragEnd} onDragCancel={clearDrag} collisionDetection={collisionDetection} sensors={sensors}>
+    <ListItem divider sx={{ minHeight: 40, px: 2, bgcolor: "background.paper", position: "relative" }}>
       <ListItemText
         primary={`Total [${items.length}${hiddenLayerItemCount ? ` (+${hiddenLayerItemCount} in hidden layers)` : ""}]`}
         primaryTypographyProps={{ variant: "body2" }}
         sx={{ minWidth: 0 }}
+      />
+      <Box
+        role="separator"
+        aria-label="Resize hierarchy labels"
+        aria-orientation="vertical"
+        tabIndex={0}
+        sx={{ width: 12, cursor: "col-resize", touchAction: "none", position: "absolute", left: `min(${60 + labelWidth}px, calc(100% - 76px))`, top: 0, bottom: 0, zIndex: 1, "&::after": { content: '""', position: "absolute", left: 5, top: 6, bottom: 6, borderLeft: 1, borderColor: "divider" } }}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          const startX = event.clientX, startWidth = labelWidth;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          const target = event.currentTarget;
+          const move = (moveEvent: PointerEvent) => onLabelWidthChange(clampDimension(startWidth + moveEvent.clientX - startX, MIN_HIERARCHY_LABEL_WIDTH, MAX_HIERARCHY_LABEL_WIDTH), false);
+          const finish = (upEvent: PointerEvent) => {
+            const width = clampDimension(startWidth + upEvent.clientX - startX, MIN_HIERARCHY_LABEL_WIDTH, MAX_HIERARCHY_LABEL_WIDTH);
+            target.removeEventListener("pointermove", move);
+            target.removeEventListener("pointerup", finish);
+            target.removeEventListener("pointercancel", finish);
+            onLabelWidthChange(width, true);
+          };
+          target.addEventListener("pointermove", move);
+          target.addEventListener("pointerup", finish);
+          target.addEventListener("pointercancel", finish);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          onLabelWidthChange(clampDimension(labelWidth + (event.key === "ArrowLeft" ? -10 : 10), MIN_HIERARCHY_LABEL_WIDTH, MAX_HIERARCHY_LABEL_WIDTH), true);
+        }}
       />
       <Stack direction="row" flexShrink={0}>
         <Tooltip title="Hide empty layers"><span><IconButton

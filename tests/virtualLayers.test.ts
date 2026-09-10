@@ -113,8 +113,9 @@ test("parses stateful virtual-layer names and groups their mutually exclusive st
 });
 
 test("parses schema-3 definitions and rejects incompatible schemas", () => {
-  const parsed = parseVirtualLayerState({ version: 3, layers: [state.layers[0], { id: 3 }] });
+  const parsed = parseVirtualLayerState({ version: 3, layers: [state.layers[0], { id: 3 }], stateGroupOrder: [" Castle ", "castle", "Village", 3] });
   assert.deepEqual(parsed.layers, [state.layers[0]]);
+  assert.deepEqual(parsed.stateGroupOrder, ["castle", "village"]);
   assert.deepEqual(parseVirtualLayerState({ version: 2, layers: state.layers }).layers, []);
   assert.deepEqual(parseVirtualLayerState({ version: 1, layers: state.layers }).layers, []);
 });

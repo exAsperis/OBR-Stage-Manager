@@ -9,6 +9,9 @@ import { formatLayerName, OUTLINER_LAYERS_TOP_TO_BOTTOM } from "./layers";
 import { setFeatureEnabled, setLayerEnabled, useLayerDisplaySettings, type FeatureSetting } from "./layerSettings";
 import { LayerIcon } from "./LayerIcon";
 import { useOwlbearStore } from "./useOwlbearStore";
+import MenuItem from "@mui/material/MenuItem";
+import TextField from "@mui/material/TextField";
+import type { ControlDensity } from "./outlinerLayout";
 
 const FEATURES: Array<{ feature: FeatureSetting; label: string }> = [
   { feature: "manageInheritance", label: "Manage inheritance" },
@@ -18,7 +21,7 @@ const FEATURES: Array<{ feature: FeatureSetting; label: string }> = [
   { feature: "visible", label: "Visible/Hidden" },
 ];
 
-export function SettingsPanel() {
+export function SettingsPanel({ editingDensity, controlDensity, onDensityChange }: { editingDensity: ControlDensity; controlDensity: ControlDensity; onDensityChange: (mode: "editing" | "control", density: ControlDensity) => void }) {
   const settings = useLayerDisplaySettings();
   const items = useOwlbearStore((state) => state.items);
   const enabled = new Set(settings.enabledLayers);
@@ -30,6 +33,12 @@ export function SettingsPanel() {
         <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 1 }}>Item States</Typography>
         {FEATURES.slice(1).map(({ feature, label }) => <FeatureToggle key={feature} feature={feature} label={label} checked={settings.features[feature]} nested />)}
       </FormGroup>
+      <Divider sx={{ mx: -2, mb: 1.5 }} />
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>Control density</Typography>
+      <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+        <DensitySelect label="Editing" value={editingDensity} onChange={(density) => onDensityChange("editing", density)} />
+        <DensitySelect label="Control" value={controlDensity} onChange={(density) => onDensityChange("control", density)} />
+      </Stack>
       <Divider sx={{ mx: -2, mb: 1.5 }} />
       <Typography id="show-layers-heading" variant="subtitle2" sx={{ mb: 0.5 }}>Show layers</Typography>
       <FormGroup>
@@ -46,6 +55,13 @@ export function SettingsPanel() {
       </FormGroup>
     </Box>
   </Box>;
+}
+
+function DensitySelect({ label, value, onChange }: { label: string; value: ControlDensity; onChange: (value: ControlDensity) => void }) {
+  return <TextField select size="small" fullWidth label={label} value={value} onChange={(event) => onChange(event.target.value as ControlDensity)}>
+    <MenuItem value="compact">Compact</MenuItem>
+    <MenuItem value="roomy">Roomy</MenuItem>
+  </TextField>;
 }
 
 function FeatureToggle({ feature, label, checked, nested = false }: { feature: FeatureSetting; label: string; checked: boolean; nested?: boolean }) {

@@ -42,7 +42,7 @@ import { activateTransparency, getTransparentState, needsTransparencyEnforcement
 import { storeLocalItemProperty, updateShadowedLocalItemProperty } from "./localItemState";
 import { applyEffectiveItemState } from "./effectiveItemState";
 import { getInheritanceBoundary } from "./inheritanceBoundary";
-import { reorderResolvedStateGroup, resolveParticipationModel, withStateGroupSelection } from "./participation";
+import { reorderResolvedStateGroup, reorderResolvedStateGroups, resolveParticipationModel, withStateGroupSelection } from "./participation";
 import { runOutlinerV1NamespaceConversion } from "./namespaceMigration";
 
 let queue: Promise<void> = Promise.resolve();
@@ -439,6 +439,14 @@ export function setStatefulVirtualLayerSelection(groupId: string, stateName: str
     }
     await setState(next);
     await enforceStateInheritance(next);
+  });
+}
+
+export function moveStateGroup(activeGroupId: string, overGroupId: string) {
+  return serialized(async () => {
+    const state = await getState();
+    const next = reorderResolvedStateGroups(state, activeGroupId, overGroupId);
+    if (next !== state) await setState(next);
   });
 }
 

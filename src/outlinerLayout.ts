@@ -2,6 +2,7 @@ import { EXTENSION_ID } from "./constants.ts";
 
 export type OutlinerMode = "full" | "minimized";
 export type MinimizedOrientation = "horizontal" | "vertical";
+export type ControlDensity = "compact" | "roomy";
 
 export interface OutlinerDimensions {
   width: number;
@@ -9,10 +10,14 @@ export interface OutlinerDimensions {
 }
 
 export interface OutlinerLayoutSettings {
-  version: 3;
+  version: 4;
   mode: OutlinerMode;
   minimizedOrientation: MinimizedOrientation;
   full: OutlinerDimensions;
+  labelWidth: number;
+  editingDensity: ControlDensity;
+  controlDensity: ControlDensity;
+  editingElevatorCollapsed: boolean;
 }
 
 export const OUTLINER_LAYOUT_SETTINGS_KEY = `${EXTENSION_ID}/layoutSettings`;
@@ -20,13 +25,24 @@ export const MIN_OUTLINER_WIDTH = 300;
 export const MAX_OUTLINER_WIDTH = 800;
 export const MIN_FULL_HEIGHT = 129;
 export const MAX_OUTLINER_HEIGHT = 800;
+export const MIN_HIERARCHY_LABEL_WIDTH = 120;
+export const MAX_HIERARCHY_LABEL_WIDTH = 320;
+export const DEFAULT_HIERARCHY_LABEL_WIDTH = 228;
 
 export const DEFAULT_OUTLINER_LAYOUT_SETTINGS: OutlinerLayoutSettings = {
-  version: 3,
+  version: 4,
   mode: "full",
   minimizedOrientation: "horizontal",
   full: { width: 375, height: 129 },
+  labelWidth: DEFAULT_HIERARCHY_LABEL_WIDTH,
+  editingDensity: "compact",
+  controlDensity: "roomy",
+  editingElevatorCollapsed: false,
 };
+
+const upgraded = (mode: OutlinerMode, minimizedOrientation: MinimizedOrientation, full: OutlinerDimensions): OutlinerLayoutSettings => ({
+  ...DEFAULT_OUTLINER_LAYOUT_SETTINGS, mode, minimizedOrientation, full,
+});
 
 export function clampDimension(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, Math.round(value)));
@@ -60,17 +76,32 @@ export function parseOutlinerLayoutSettings(value: unknown): OutlinerLayoutSetti
   if ((mode !== "full" && mode !== "minimized") || !full) return;
   if (version === 1) {
     if (!dimensions((value as { minimized?: unknown }).minimized, 1)) return;
-    return { version: 3, mode, minimizedOrientation: "horizontal", full };
+    return upgraded(mode, "horizontal", full);
   }
   if (version === 2) {
     const orientation = (value as { minimizedOrientation?: unknown }).minimizedOrientation;
     if (orientation !== "horizontal" && orientation !== "vertical") return;
-    return { version: 3, mode, minimizedOrientation: orientation, full };
+    return upgraded(mode, orientation, full);
   }
-  if (version !== 3) return;
+  if (version === 3) {
+    const orientation = (value as { minimizedOrientation?: unknown }).minimizedOrientation;
+    if (orientation !== "horizontal" && orientation !== "vertical") return;
+    return upgraded(mode, orientation, full);
+  }
+  if (version !== 4) return;
   const orientation = (value as { minimizedOrientation?: unknown }).minimizedOrientation;
   if (orientation !== "horizontal" && orientation !== "vertical") return;
-  return { version: 3, mode, minimizedOrientation: orientation, full };
+  const labelWidth = (value as { labelWidth?: unknown }).labelWidth;
+  const editingDensity = (value as { editingDensity?: unknown }).editingDensity;
+  const controlDensity = (value as { controlDensity?: unknown }).controlDensity;
+  const editingElevatorCollapsed = (value as { editingElevatorCollapsed?: unknown }).editingElevatorCollapsed;
+  return {
+    version: 4, mode, minimizedOrientation: orientation, full,
+    labelWidth: clampDimension(typeof labelWidth === "number" && Number.isFinite(labelWidth) ? labelWidth : DEFAULT_HIERARCHY_LABEL_WIDTH, MIN_HIERARCHY_LABEL_WIDTH, MAX_HIERARCHY_LABEL_WIDTH),
+    editingDensity: editingDensity === "roomy" ? "roomy" : "compact",
+    controlDensity: controlDensity === "compact" ? "compact" : "roomy",
+    editingElevatorCollapsed: editingElevatorCollapsed === true,
+  };
 }
 
 export function readOutlinerLayoutSettings(storage: Pick<Storage, "getItem"> = window.localStorage) {
