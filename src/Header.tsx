@@ -1,5 +1,6 @@
 import React from "react";
 
+import Box from "@mui/material/Box";
 import CardHeader from "@mui/material/CardHeader";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
@@ -17,6 +18,7 @@ export function Header({
   return (
     <>
       <CardHeader
+        avatar={title ? <Box component="img" src="/icon-color.svg" alt="" aria-hidden sx={{ width: 24, height: 24 }} /> : undefined}
         title={title && <>{title}{" "}<Typography component="span" variant="caption" color="text.secondary">v{packageJson.version}</Typography></>}
         action={action}
         sx={{ bgcolor: "background.paper" }}
