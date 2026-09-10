@@ -13,22 +13,24 @@ Run `npm run build` to create the production site in `dist`.
 
 ### Local Owlbear Rodeo testing
 
-Create `public/manifest-local.json` if it is missing. This file is intentionally
-ignored by Git so it cannot replace the production manifest accidentally:
+`npm run dev:obr` regenerates `public/manifest-local.json` from the current
+package version each time it starts. This file is intentionally ignored by Git
+so it cannot replace the production manifest accidentally. The generated file
+has this shape:
 
 ```json
 {
   "name": "Stage Manager (Local)",
-  "version": "1.0.5-local",
+  "version": "1.0.6-local",
   "manifest_version": 1,
   "author": "es Asperis",
-  "icon": "/icon-color.svg",
-  "background_url": "/background.html",
+  "icon": "http://localhost:5173/icon-color.svg",
+  "background_url": "http://localhost:5173/background.html",
   "description": "Local development build of Stage Manager",
   "action": {
     "title": "Stage Manager (Local)",
-    "icon": "/icon-bw.svg",
-    "popover": "/extension.html?v=1.0.5-local",
+    "icon": "http://localhost:5173/icon-bw.svg",
+    "popover": "http://localhost:5173/extension.html?v=1.0.6-local",
     "height": 129,
     "width": 375
   }
