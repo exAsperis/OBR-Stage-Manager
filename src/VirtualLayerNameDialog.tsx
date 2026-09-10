@@ -14,11 +14,12 @@ import { useState, type FormEvent } from "react";
 
 export interface GuardianLayerOption { id: string; name: string }
 
-export function VirtualLayerNameDialog({ title, initialValue = "", submitLabel, linkedLayerCount = 1,
+export function NameDialog({ title, initialValue = "", submitLabel, item = false, linkedLayerCount = 1,
   dependentLayerCount = 0, guardianOptions = [], onCancel, onSubmit }: {
   title: string;
   initialValue?: string;
   submitLabel: string;
+  item?: boolean;
   linkedLayerCount?: number;
   dependentLayerCount?: number;
   guardianOptions?: GuardianLayerOption[];
@@ -38,27 +39,28 @@ export function VirtualLayerNameDialog({ title, initialValue = "", submitLabel, 
     try {
       await onSubmit(name, renameLinked);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to save the virtual layer name.");
+      setError(reason instanceof Error ? reason.message : item ? "Unable to rename the item." : "Unable to save the virtual layer name.");
       setSaving(false);
     }
   };
 
-  return <Dialog open onClose={saving ? undefined : onCancel} fullWidth maxWidth="xs" aria-labelledby="virtual-layer-name-title">
+  const fieldLabel = item ? "Item name" : "Virtual layer name";
+  return <Dialog open onClose={saving ? undefined : onCancel} fullWidth maxWidth="xs" aria-labelledby="name-dialog-title">
     <Stack component="form" onSubmit={(event) => void submit(event)}>
-      <DialogTitle id="virtual-layer-name-title">{title}</DialogTitle>
+      <DialogTitle id="name-dialog-title">{title}</DialogTitle>
       <DialogContent>
         <TextField
           autoFocus
           fullWidth
           margin="dense"
-          label="Virtual layer name"
+          label={fieldLabel}
           value={name}
           disabled={saving}
           onChange={(event) => setName(event.target.value)}
-          helperText="Use group: state for alternatives and / for guardian dependencies."
-          inputProps={{ "aria-label": "Virtual layer name" }}
+          helperText={item ? undefined : "Use group: state for alternatives and / for guardian dependencies."}
+          inputProps={{ "aria-label": fieldLabel }}
         />
-        {guardianOptions.length > 0 && <TextField
+        {!item && guardianOptions.length > 0 && <TextField
           select
           fullWidth
           margin="dense"
@@ -76,7 +78,7 @@ export function VirtualLayerNameDialog({ title, initialValue = "", submitLabel, 
           <MenuItem value="" disabled>Select a virtual layer…</MenuItem>
           {guardianOptions.map((option) => <MenuItem key={option.id} value={option.id}>{option.name}</MenuItem>)}
         </TextField>}
-        {linkedLayerCount > 1 && <Stack>
+        {!item && linkedLayerCount > 1 && <Stack>
           <FormControlLabel
             control={<Switch checked={renameLinked} disabled={saving} onChange={(event) => setRenameLinked(event.target.checked)} />}
             label={`Rename all ${linkedLayerCount} linked virtual layers`}

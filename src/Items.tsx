@@ -22,11 +22,13 @@ import Tooltip from "@mui/material/Tooltip";
 import HideEmptyLayersIcon from "@mui/icons-material/LayersClearRounded";
 import ShowPopulatedLayersIcon from "@mui/icons-material/LayersRounded";
 import { getVisibleSelectionRange } from "./hierarchySelection";
-import { VirtualLayerNameDialog } from "./VirtualLayerNameDialog";
+import { NameDialog } from "./VirtualLayerNameDialog";
+import { HierarchyActionLayout } from "./HierarchyActions";
 
 type NameDialogRequest =
   | { mode: "create"; layer: Item["layer"] }
-  | { mode: "rename"; definition: VirtualLayerDefinition };
+  | { mode: "rename"; definition: VirtualLayerDefinition }
+  | { mode: "rename-item"; item: Item };
 
 export function Items({ search }: { search: string }) {
   const items = useOwlbearStore((state) => state.items);
@@ -128,12 +130,15 @@ export function Items({ search }: { search: string }) {
 
   function openCreate(layer: Item["layer"]) { setNameDialog({ mode: "create", layer }); }
   function openRename(definition: VirtualLayerDefinition) { setNameDialog({ mode: "rename", definition }); }
+  function openItemRename(item: Item) { setNameDialog({ mode: "rename-item", item }); }
   async function saveName(name: string, renameLinked: boolean) {
     if (!nameDialog) return;
     if (nameDialog.mode === "create") await addVirtualLayer(nameDialog.layer, name);
-    else await updateVirtualLayerName(nameDialog.definition.id, name, renameLinked);
+    else if (nameDialog.mode === "rename") await updateVirtualLayerName(nameDialog.definition.id, name, renameLinked);
+    else await OBR.scene.items.updateItems([nameDialog.item.id], (items) => { items[0].name = name; });
     setNameDialog(undefined);
   }
+  function deleteItem(item: Item) { void OBR.scene.items.deleteItems([item.id]); }
   function confirmDelete(definition: VirtualLayerDefinition) { if (window.confirm(`Delete virtual layer "${definition.name}"?\nIts objects will become Unassigned. No objects will be deleted.`)) void removeVirtualLayer(definition.id).catch(() => window.alert("Unable to delete the virtual layer.")); }
 
   function dropPositionForEvent(event: DragMoveEvent | DragEndEvent): DropPosition {
@@ -201,7 +206,7 @@ export function Items({ search }: { search: string }) {
   }, [layerSettings.enabledLayers, role, searching, shown]);
   const visibleLayerSet = new Set(shownLayers);
   const sortableIds = [...shownIds, ...virtualLayers.layers.filter((entry) => visibleLayerSet.has(entry.obrLayer)).map((entry) => `VL:${entry.id}`), ...shownLayers.map((layer) => `UG:${layer}`)];
-  return <DndContext onDragStart={dragStart} onDragMove={dragMove} onDragEnd={dragEnd} onDragCancel={clearDrag} collisionDetection={collisionDetection} sensors={sensors}>
+  return <HierarchyActionLayout><DndContext onDragStart={dragStart} onDragMove={dragMove} onDragEnd={dragEnd} onDragCancel={clearDrag} collisionDetection={collisionDetection} sensors={sensors}>
     <ListItem divider sx={{ minHeight: 40, px: 2, bgcolor: "background.paper" }}>
       <ListItemText
         primary={`Total [${items.length}${hiddenLayerItemCount ? ` (+${hiddenLayerItemCount} in hidden layers)` : ""}]`}
@@ -225,21 +230,22 @@ export function Items({ search }: { search: string }) {
       </Stack>
     </ListItem>
     <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-      {shownLayers.map((layer) => <ItemList key={layer} layer={layer} role={role} searching={searching} items={shown.filter((item) => item.layer === layer)} nativeItems={items.filter((item) => item.layer === layer)} definitions={virtualLayers.layers.filter((entry) => entry.obrLayer === layer)} groupOrder={orderedGroupIds(virtualLayers, layer)} groupDropPosition={groupDropPosition} resolveGroup={(item) => resolveGroupId(item, virtualLayers)} onCreate={() => openCreate(layer)} onRename={openRename} onDelete={confirmDelete} onItemSelect={select} onItemFocus={(item) => void recenter([...new Set([...(selection ?? []), item.id])])} onItemLocate={(item) => void locate(item)} onItemStack={(ids, operation: StackOperation) => void stackItems(items, ids, operation)} onGroupStack={(nativeLayer, id, operation) => void stackVirtualLayer(nativeLayer, id, operation)} />)}
+      {shownLayers.map((layer) => <ItemList key={layer} layer={layer} role={role} searching={searching} items={shown.filter((item) => item.layer === layer)} nativeItems={items.filter((item) => item.layer === layer)} definitions={virtualLayers.layers.filter((entry) => entry.obrLayer === layer)} groupOrder={orderedGroupIds(virtualLayers, layer)} groupDropPosition={groupDropPosition} resolveGroup={(item) => resolveGroupId(item, virtualLayers)} onCreate={() => openCreate(layer)} onRename={openRename} onDelete={confirmDelete} onItemRename={openItemRename} onItemDelete={deleteItem} onItemSelect={select} onItemFocus={(item) => void recenter([...new Set([...(selection ?? []), item.id])])} onItemLocate={(item) => void locate(item)} onItemStack={(ids, operation: StackOperation) => void stackItems(items, ids, operation)} onGroupStack={(nativeLayer, id, operation) => void stackVirtualLayer(nativeLayer, id, operation)} />)}
       <ItemDragOverlay dragId={dragId} />
     </SortableContext>
-    {nameDialog && <VirtualLayerNameDialog
-      title={nameDialog.mode === "create" ? "Create virtual layer" : "Rename virtual layer"}
-      initialValue={nameDialog.mode === "rename" ? nameDialog.definition.name : ""}
+    {nameDialog && <NameDialog
+      title={nameDialog.mode === "create" ? "Create virtual layer" : nameDialog.mode === "rename" ? "Rename virtual layer" : "Rename item"}
+      initialValue={nameDialog.mode === "rename" ? nameDialog.definition.name : nameDialog.mode === "rename-item" ? nameDialog.item.name : ""}
       submitLabel={nameDialog.mode === "create" ? "Create" : "Rename"}
+      item={nameDialog.mode === "rename-item"}
       linkedLayerCount={nameDialog.mode === "rename" ? linkedVirtualLayers(virtualLayers, nameDialog.definition.id).length : 1}
       dependentLayerCount={nameDialog.mode === "rename" ? dependentVirtualLayers(virtualLayers, nameDialog.definition.id).length : 0}
-      guardianOptions={virtualLayers.layers
+      guardianOptions={nameDialog.mode === "rename-item" ? [] : virtualLayers.layers
         .filter((definition) => nameDialog.mode === "create" || normalizedVirtualLayerName(definition.name) !== normalizedVirtualLayerName(nameDialog.definition.name))
         .filter((definition, index, definitions) => definitions.findIndex((candidate) => normalizedVirtualLayerName(candidate.name) === normalizedVirtualLayerName(definition.name)) === index)
         .map((definition) => ({ id: definition.id, name: definition.name }))}
       onCancel={() => setNameDialog(undefined)}
       onSubmit={saveName}
     />}
-  </DndContext>;
+  </DndContext></HierarchyActionLayout>;
 }

@@ -29,12 +29,16 @@ export function SendMenuButton({
   confirmLayerMove,
   onOpenChange,
   allowStackWhenEmpty = false,
+  externalAnchor,
+  hideButton = false,
 }: {
   itemIds: string[];
   onStack: (operation: StackOperation) => void;
   confirmLayerMove?: string;
   onOpenChange?: (open: boolean) => void;
   allowStackWhenEmpty?: boolean;
+  externalAnchor?: HTMLElement | null;
+  hideButton?: boolean;
 }) {
   const role = useOwlbearStore((state) => state.role);
   const virtualLayers = useOwlbearStore((state) => state.virtualLayers);
@@ -77,7 +81,7 @@ export function SendMenuButton({
 
   const iconSx = { color: "text.secondary", minWidth: "32px", "& svg": { fontSize: "1.25rem" } };
   return <>
-    <Tooltip title="Send" disableInteractive>
+    {!hideButton && <Tooltip title="Send" disableInteractive>
       <IconButton
         aria-label="Send"
         size="small"
@@ -87,10 +91,10 @@ export function SendMenuButton({
       >
         <SendIcon fontSize="small" />
       </IconButton>
-    </Tooltip>
+    </Tooltip>}
     <Menu
-      anchorEl={menuAnchor}
-      open={Boolean(menuAnchor)}
+      anchorEl={externalAnchor ?? menuAnchor}
+      open={Boolean(externalAnchor ?? menuAnchor)}
       onClose={closeMenus}
       MenuListProps={{ dense: true, "aria-label": "Send" }}
     >
