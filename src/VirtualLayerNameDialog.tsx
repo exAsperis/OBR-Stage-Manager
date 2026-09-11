@@ -1,4 +1,5 @@
 import Alert from "@mui/material/Alert";
+import Autocomplete from "@mui/material/Autocomplete";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
@@ -10,12 +11,12 @@ import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 export interface GuardianLayerOption { id: string; name: string }
 
 export function NameDialog({ title, initialValue = "", submitLabel, item = false, linkedLayerCount = 1,
-  dependentLayerCount = 0, guardianOptions = [], onCancel, onSubmit }: {
+  dependentLayerCount = 0, guardianOptions = [], nameOptions, onCancel, onSubmit }: {
   title: string;
   initialValue?: string;
   submitLabel: string;
@@ -23,6 +24,7 @@ export function NameDialog({ title, initialValue = "", submitLabel, item = false
   linkedLayerCount?: number;
   dependentLayerCount?: number;
   guardianOptions?: GuardianLayerOption[];
+  nameOptions?: string[];
   onCancel: () => void;
   onSubmit: (name: string, renameLinked: boolean) => Promise<void>;
 }) {
@@ -30,6 +32,7 @@ export function NameDialog({ title, initialValue = "", submitLabel, item = false
   const [renameLinked, setRenameLinked] = useState(false);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -45,12 +48,38 @@ export function NameDialog({ title, initialValue = "", submitLabel, item = false
   };
 
   const fieldLabel = item ? "Item name" : "Virtual layer name";
-  return <Dialog open onClose={saving ? undefined : onCancel} fullWidth maxWidth="xs" aria-labelledby="name-dialog-title">
+  return <Dialog
+    open
+    onClose={saving ? undefined : onCancel}
+    fullWidth
+    maxWidth="xs"
+    aria-labelledby="name-dialog-title"
+    TransitionProps={{ onEntered: () => nameInputRef.current?.focus() }}
+  >
     <Stack component="form" onSubmit={(event) => void submit(event)}>
       <DialogTitle id="name-dialog-title">{title}</DialogTitle>
       <DialogContent>
-        <TextField
+        {nameOptions ? <Autocomplete
+          freeSolo
+          options={nameOptions}
+          value={name}
+          inputValue={name}
+          disabled={saving}
+          onChange={(_event, value) => setName(value ?? "")}
+          onInputChange={(_event, value) => setName(value)}
+          renderInput={(params) => <TextField
+            {...params}
+            autoFocus
+            inputRef={nameInputRef}
+            fullWidth
+            margin="dense"
+            label={fieldLabel}
+            helperText="Use group: state for alternatives and / for guardian dependencies."
+            inputProps={{ ...params.inputProps, "aria-label": fieldLabel }}
+          />}
+        /> : <TextField
           autoFocus
+          inputRef={nameInputRef}
           fullWidth
           margin="dense"
           label={fieldLabel}
@@ -59,7 +88,7 @@ export function NameDialog({ title, initialValue = "", submitLabel, item = false
           onChange={(event) => setName(event.target.value)}
           helperText={item ? undefined : "Use group: state for alternatives and / for guardian dependencies."}
           inputProps={{ "aria-label": fieldLabel }}
-        />
+        />}
         {!item && guardianOptions.length > 0 && <TextField
           select
           fullWidth

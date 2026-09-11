@@ -24,6 +24,7 @@ import HideEmptyLayersIcon from "@mui/icons-material/LayersClearRounded";
 import ShowPopulatedLayersIcon from "@mui/icons-material/LayersRounded";
 import { getVisibleSelectionRange } from "./hierarchySelection";
 import { NameDialog } from "./VirtualLayerNameDialog";
+import { virtualLayerNameSuggestions } from "./virtualLayerNameSuggestions";
 import { HierarchyActionLayout } from "./HierarchyActions";
 import { clampDimension, MAX_HIERARCHY_LABEL_WIDTH, MIN_HIERARCHY_LABEL_WIDTH } from "./outlinerLayout";
 import { itemHasPermission } from "./hasPermission";
@@ -275,6 +276,7 @@ export function Items({ search, labelWidth, actionSlotSize, onLabelWidthChange }
       initialValue={nameDialog.mode === "rename" ? nameDialog.definition.name : nameDialog.mode === "rename-item" ? nameDialog.item.name : ""}
       submitLabel={nameDialog.mode === "create" ? "Create" : "Rename"}
       item={nameDialog.mode === "rename-item"}
+      nameOptions={nameDialog.mode === "create" ? virtualLayerNameSuggestions(virtualLayers.layers, nameDialog.layer) : undefined}
       linkedLayerCount={nameDialog.mode === "rename" ? linkedVirtualLayers(virtualLayers, nameDialog.definition.id).length : 1}
       dependentLayerCount={nameDialog.mode === "rename" ? dependentVirtualLayers(virtualLayers, nameDialog.definition.id).length : 0}
       guardianOptions={nameDialog.mode === "rename-item" ? [] : virtualLayers.layers
