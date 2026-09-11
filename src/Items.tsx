@@ -29,6 +29,7 @@ import { HierarchyActionLayout } from "./HierarchyActions";
 import { clampDimension, MAX_HIERARCHY_LABEL_WIDTH, MIN_HIERARCHY_LABEL_WIDTH } from "./outlinerLayout";
 import { itemHasPermission } from "./hasPermission";
 import { itemDeleteTargets } from "./itemDeleteTargets";
+import { ActionDialog } from "./ActionDialog";
 
 type NameDialogRequest =
   | { mode: "create"; layer: Item["layer"] }
@@ -57,6 +58,9 @@ export function Items({ search, labelWidth, actionSlotSize, onLabelWidthChange }
   const [dragId, setDragId] = useState<string | null>(null);
   const [groupDropPosition, setGroupDropPosition] = useState<DropPosition | undefined>();
   const [nameDialog, setNameDialog] = useState<NameDialogRequest>();
+  const [deleteDialog, setDeleteDialog] = useState<VirtualLayerDefinition>();
+  const [deleteError, setDeleteError] = useState<string>();
+  const [deleting, setDeleting] = useState(false);
   const dragPointerClientY = useRef<number | undefined>();
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 3 } }), useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }), useSensor(KeyboardSensor));
 
@@ -148,7 +152,20 @@ export function Items({ search, labelWidth, actionSlotSize, onLabelWidthChange }
     const ids = itemDeleteTargets(items, selection, item.id, (entry) => itemHasPermission(entry, "DELETE", permissions, role, OBR.player.id));
     if (ids.length) void OBR.scene.items.deleteItems(ids);
   }
-  function confirmDelete(definition: VirtualLayerDefinition) { if (window.confirm(`Delete virtual layer "${definition.name}"?\nIts objects will become Unassigned. No objects will be deleted.`)) void removeVirtualLayer(definition.id).catch(() => window.alert("Unable to delete the virtual layer.")); }
+  function confirmDelete(definition: VirtualLayerDefinition) { setDeleteError(undefined); setDeleteDialog(definition); }
+  async function deleteVirtualLayer() {
+    if (!deleteDialog) return;
+    setDeleting(true);
+    setDeleteError(undefined);
+    try {
+      await removeVirtualLayer(deleteDialog.id);
+      setDeleteDialog(undefined);
+    } catch {
+      setDeleteError("Unable to delete the virtual layer.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function dropPositionForEvent(event: DragMoveEvent | DragEndEvent): DropPosition {
     const pointerY = dragPointerClientY.current;
@@ -285,6 +302,16 @@ export function Items({ search, labelWidth, actionSlotSize, onLabelWidthChange }
         .map((definition) => ({ id: definition.id, name: definition.name }))}
       onCancel={() => setNameDialog(undefined)}
       onSubmit={saveName}
+    />}
+    {deleteDialog && <ActionDialog
+      title="Delete virtual layer"
+      message={`Delete virtual layer “${deleteDialog.name}”?\n\nIts objects will become Unassigned. No objects will be deleted.`}
+      error={deleteError}
+      actionLabel="Delete"
+      actionColor="error"
+      busy={deleting}
+      onCancel={() => { setDeleteDialog(undefined); setDeleteError(undefined); }}
+      onAction={() => void deleteVirtualLayer()}
     />}
   </DndContext></HierarchyActionLayout>;
 }

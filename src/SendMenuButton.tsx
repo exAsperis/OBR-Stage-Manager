@@ -18,6 +18,13 @@ import { useOwlbearStore } from "./useOwlbearStore";
 import { orderedGroupIds, UNASSIGNED_ID } from "./virtualLayers";
 import { assignItems } from "./virtualLayerService";
 import { useLayerDisplaySettings } from "./layerSettings";
+import { ActionDialog } from "./ActionDialog";
+
+interface MoveRequest {
+  layer: Parameters<typeof assignItems>[2];
+  virtualLayerId?: string;
+  destinationName?: string;
+}
 
 function LayerMoveIcon() {
   return <SvgIcon fontSize="small"><path d="m8 2 7 3.5L8 9 1 5.5 8 2ZM2.7 9.4 8 12l5.3-2.6L15 11l-7 3.5L1 11l1.7-1.6Zm0 5L8 17l5.3-2.6L15 16l-7 3.5L1 16l1.7-1.6ZM17 7l5 5-5 5v-3h-3v-4h3V7Z" /></SvgIcon>;
@@ -46,6 +53,8 @@ export function SendMenuButton({
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [layerMenuAnchor, setLayerMenuAnchor] = useState<HTMLElement | null>(null);
   const [moving, setMoving] = useState(false);
+  const [moveRequest, setMoveRequest] = useState<MoveRequest>();
+  const [moveError, setMoveError] = useState<string>();
 
   function stopEvent(event: React.SyntheticEvent) {
     event.preventDefault();
@@ -64,16 +73,27 @@ export function SendMenuButton({
     closeMenus();
   }
 
-  async function move(layer: Parameters<typeof assignItems>[2], virtualLayerId?: string, destinationName?: string) {
-    if (confirmLayerMove && !window.confirm(
-      `Move all ${itemIds.length} item${itemIds.length === 1 ? "" : "s"} from “${confirmLayerMove}” to “${destinationName ?? formatLayerName(layer!)}”?\n\nUndoing this change may be difficult.`,
-    )) return;
+  function requestMove(layer: Parameters<typeof assignItems>[2], virtualLayerId?: string, destinationName?: string) {
+    const request = { layer, virtualLayerId, destinationName };
+    if (confirmLayerMove) {
+      setMoveRequest(request);
+      setLayerMenuAnchor(null);
+      setMenuAnchor(null);
+      onOpenChange?.(false);
+      return;
+    }
+    void move(request);
+  }
+
+  async function move(request: MoveRequest) {
     setMoving(true);
+    setMoveError(undefined);
     try {
-      await assignItems(itemIds, virtualLayerId, layer);
+      await assignItems(itemIds, request.virtualLayerId, request.layer);
+      setMoveRequest(undefined);
       closeMenus();
     } catch {
-      window.alert("Unable to move the items.");
+      setMoveError("Unable to move the items.");
     } finally {
       setMoving(false);
     }
@@ -114,17 +134,27 @@ export function SendMenuButton({
       {getOutlinerLayers(role, layerSettings.enabledLayers).flatMap((layer) => {
         const definitions = virtualLayers.layers.filter((entry) => entry.obrLayer === layer);
         return [
-          <MenuItem key={layer} disabled={moving} onClick={() => void move(layer, undefined, formatLayerName(layer))}>
+          <MenuItem key={layer} disabled={moving} onClick={() => requestMove(layer, undefined, formatLayerName(layer))}>
             <ListItemIcon sx={iconSx}><LayerIcon layer={layer} /></ListItemIcon>
             <ListItemText primary={formatLayerName(layer)} />
           </MenuItem>,
           ...(definitions.length ? orderedGroupIds(virtualLayers, layer).map((groupId) => {
             const definition = definitions.find((entry) => entry.id === groupId);
             const name = definition?.name ?? "Unassigned";
-            return <MenuItem key={`${layer}:${groupId}`} disabled={moving} sx={{ pl: 6 }} onClick={() => void move(layer, definition?.id, name)}><ListItemText primary={name} sx={{ fontStyle: groupId === UNASSIGNED_ID ? "italic" : undefined }} /></MenuItem>;
+            return <MenuItem key={`${layer}:${groupId}`} disabled={moving} sx={{ pl: 6 }} onClick={() => requestMove(layer, definition?.id, name)}><ListItemText primary={name} sx={{ fontStyle: groupId === UNASSIGNED_ID ? "italic" : undefined }} /></MenuItem>;
           }) : []),
         ];
       })}
     </Menu>
+    {moveRequest && <ActionDialog
+      title="Move all items"
+      message={`Move all ${itemIds.length} item${itemIds.length === 1 ? "" : "s"} from “${confirmLayerMove}” to “${moveRequest.destinationName ?? formatLayerName(moveRequest.layer!)}”?\n\nUndoing this change may be difficult.`}
+      error={moveError}
+      actionLabel="Move"
+      busy={moving}
+      onCancel={() => { setMoveRequest(undefined); setMoveError(undefined); onOpenChange?.(false); }}
+      onAction={() => void move(moveRequest)}
+    />}
+    {!moveRequest && moveError && <ActionDialog title="Unable to move items" message={moveError} onCancel={() => setMoveError(undefined)} />}
   </>;
 }

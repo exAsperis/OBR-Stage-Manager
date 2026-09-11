@@ -21,7 +21,7 @@ has this shape:
 ```json
 {
   "name": "Stage Manager (Local)",
-  "version": "1.5.1-local",
+  "version": "1.5.2-local",
   "manifest_version": 1,
   "author": "ex Asperis",
   "icon": "http://localhost:5173/icon-color.svg",
@@ -30,7 +30,7 @@ has this shape:
   "action": {
     "title": "Stage Manager (Local)",
     "icon": "http://localhost:5173/icon-bw.svg",
-    "popover": "http://localhost:5173/extension.html?v=1.5.1-local",
+    "popover": "http://localhost:5173/extension.html?v=1.5.2-local",
     "height": 129,
     "width": 375
   }
