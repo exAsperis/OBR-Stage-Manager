@@ -3,6 +3,7 @@ import { ELEVATOR_METADATA_KEY, EXTENSION_ID } from "./constants";
 import { enteredElevator, getElevatorConfiguration, isElevatorActive, isElevatorSubject, resolveElevatorDestination, selectWinningElevator, type Position } from "./elevator";
 import { hasBoundaryViolation, stateFromMetadata, type VirtualLayerState } from "./virtualLayers";
 import { assignItems, enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers } from "./virtualLayerService";
+import { isAuthoritativeRole, retainExistingSelection, selectedSuppressedItemIds } from "./selectionSuppression";
 
 const SEND_CONTEXT_MENU_ID = `${EXTENSION_ID}/send`;
 const ELEVATOR_CONTEXT_MENU_ID = `${EXTENSION_ID}/elevator`;
@@ -10,12 +11,14 @@ const ELEVATOR_CONTEXT_MENU_ID = `${EXTENSION_ID}/elevator`;
 let ready = false;
 let unsubscribeItems: (() => void) | undefined;
 let unsubscribeMetadata: (() => void) | undefined;
+let unsubscribePlayer: (() => void) | undefined;
 let reconciling = false;
 let reconcilePending = false;
 let latestMetadataState: VirtualLayerState | undefined;
 let previousTokenPositions = new Map<string, Position>();
 let elevatorQueue: Promise<void> = Promise.resolve();
 let sceneEpoch = 0;
+let selectedItemIds = new Set<string>();
 
 function snapshotTokenPositions(items: Item[]) {
   return new Map(items.filter(isElevatorSubject).map((item) => [item.id, { ...item.position }]));
@@ -23,7 +26,7 @@ function snapshotTokenPositions(items: Item[]) {
 
 async function processElevators(items: Item[], previous: ReadonlyMap<string, Position>, epoch: number) {
   if (epoch !== sceneEpoch) return;
-  if (!(await OBR.scene.isReady()) || (await OBR.player.getRole()) !== "GM") return;
+  if (!(await OBR.scene.isReady()) || !isAuthoritativeRole(await OBR.player.getRole())) return;
   const state = latestMetadataState ?? stateFromMetadata(await OBR.scene.getMetadata());
   const elevators = items.filter(isShape).filter((item) => getElevatorConfiguration(item) && isElevatorActive(item));
   for (const token of items.filter(isElevatorSubject)) {
@@ -44,7 +47,23 @@ async function processElevators(items: Item[], previous: ReadonlyMap<string, Pos
   }
 }
 
+function deselectSuppressedItems(items: Item[]) {
+  selectedItemIds = retainExistingSelection(items, selectedItemIds);
+  const suppressed = selectedSuppressedItemIds(items, selectedItemIds);
+  if (!suppressed.length) return;
+  for (const id of suppressed) selectedItemIds.delete(id);
+  void OBR.player.deselect(suppressed).catch((error) => {
+    console.error("Stage Manager could not deselect suppressed items.", error);
+    void OBR.player.getSelection().then((selection) => {
+      selectedItemIds = new Set(selection ?? []);
+    }, (selectionError) => {
+      console.error("Stage Manager could not refresh the local selection.", selectionError);
+    });
+  });
+}
+
 function handleItemsChanged(items: Item[]) {
+  deselectSuppressedItems(items);
   const previous = previousTokenPositions;
   previousTokenPositions = snapshotTokenPositions(items);
   const epoch = sceneEpoch;
@@ -62,7 +81,7 @@ async function reconcile() {
   try {
     do {
       reconcilePending = false;
-      if (isVirtualLayerWriteInFlight() || !(await OBR.scene.isReady()) || (await OBR.player.getRole()) !== "GM") continue;
+      if (isVirtualLayerWriteInFlight() || !(await OBR.scene.isReady()) || !isAuthoritativeRole(await OBR.player.getRole())) continue;
       // Metadata change events carry the authoritative snapshot. Re-reading
       // immediately after an event can briefly return the previous value in a
       // separate extension iframe, which makes a completed state switch revert.
@@ -80,9 +99,16 @@ async function startReconciliation() {
   sceneEpoch += 1;
   unsubscribeItems?.(); unsubscribeMetadata?.();
   latestMetadataState = undefined;
-  if (!(await OBR.scene.isReady())) return;
+  if (!(await OBR.scene.isReady())) {
+    previousTokenPositions.clear();
+    selectedItemIds.clear();
+    return;
+  }
+  selectedItemIds = new Set(await OBR.player.getSelection() ?? []);
   latestMetadataState = stateFromMetadata(await OBR.scene.getMetadata());
-  previousTokenPositions = snapshotTokenPositions(await OBR.scene.items.getItems());
+  const items = await OBR.scene.items.getItems();
+  previousTokenPositions = snapshotTokenPositions(items);
+  deselectSuppressedItems(items);
   unsubscribeItems = OBR.scene.items.onChange(handleItemsChanged);
   unsubscribeMetadata = OBR.scene.onMetadataChange((metadata) => {
     latestMetadataState = stateFromMetadata(metadata);
@@ -93,6 +119,10 @@ async function startReconciliation() {
 
 OBR.onReady(async () => {
   ready = true;
+  selectedItemIds = new Set(await OBR.player.getSelection() ?? []);
+  unsubscribePlayer = OBR.player.onChange((player) => {
+    selectedItemIds = new Set(player.selection ?? []);
+  });
   await startReconciliation();
   OBR.scene.onReadyChange(() => { void startReconciliation(); });
   await OBR.contextMenu.create({
@@ -144,4 +174,5 @@ window.addEventListener("beforeunload", () => {
   void OBR.contextMenu.remove(ELEVATOR_CONTEXT_MENU_ID);
   unsubscribeItems?.();
   unsubscribeMetadata?.();
+  unsubscribePlayer?.();
 });
