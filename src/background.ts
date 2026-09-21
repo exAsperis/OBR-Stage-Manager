@@ -1,9 +1,11 @@
-import OBR from "@owlbear-rodeo/sdk";
-import { EXTENSION_ID } from "./constants";
+import OBR, { isShape, type Item } from "@owlbear-rodeo/sdk";
+import { ELEVATOR_METADATA_KEY, EXTENSION_ID } from "./constants";
+import { enteredElevator, getElevatorConfiguration, isElevatorActive, isElevatorSubject, resolveElevatorDestination, selectWinningElevator, type Position } from "./elevator";
 import { hasBoundaryViolation, stateFromMetadata, type VirtualLayerState } from "./virtualLayers";
-import { enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers } from "./virtualLayerService";
+import { assignItems, enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers } from "./virtualLayerService";
 
 const SEND_CONTEXT_MENU_ID = `${EXTENSION_ID}/send`;
+const ELEVATOR_CONTEXT_MENU_ID = `${EXTENSION_ID}/elevator`;
 
 let ready = false;
 let unsubscribeItems: (() => void) | undefined;
@@ -11,6 +13,45 @@ let unsubscribeMetadata: (() => void) | undefined;
 let reconciling = false;
 let reconcilePending = false;
 let latestMetadataState: VirtualLayerState | undefined;
+let previousTokenPositions = new Map<string, Position>();
+let elevatorQueue: Promise<void> = Promise.resolve();
+let sceneEpoch = 0;
+
+function snapshotTokenPositions(items: Item[]) {
+  return new Map(items.filter(isElevatorSubject).map((item) => [item.id, { ...item.position }]));
+}
+
+async function processElevators(items: Item[], previous: ReadonlyMap<string, Position>, epoch: number) {
+  if (epoch !== sceneEpoch) return;
+  if (!(await OBR.scene.isReady()) || (await OBR.player.getRole()) !== "GM") return;
+  const state = latestMetadataState ?? stateFromMetadata(await OBR.scene.getMetadata());
+  const elevators = items.filter(isShape).filter((item) => getElevatorConfiguration(item) && isElevatorActive(item));
+  for (const token of items.filter(isElevatorSubject)) {
+    if (epoch !== sceneEpoch) return;
+    const prior = previous.get(token.id);
+    const winner = selectWinningElevator(elevators.filter((elevator) =>
+      elevator.id !== token.id && enteredElevator(elevator, prior, token.position)));
+    if (!winner) continue;
+    const configuration = getElevatorConfiguration(winner);
+    if (!configuration) continue;
+    const destination = resolveElevatorDestination(configuration, state);
+    if (!destination) continue;
+    try {
+      await assignItems([token.id], destination.virtualLayerId, destination.layer);
+    } catch (error) {
+      console.error("Stage Manager could not move an item through an Elevator.", error);
+    }
+  }
+}
+
+function handleItemsChanged(items: Item[]) {
+  const previous = previousTokenPositions;
+  previousTokenPositions = snapshotTokenPositions(items);
+  const epoch = sceneEpoch;
+  elevatorQueue = elevatorQueue.then(() => processElevators(items, previous, epoch), () => processElevators(items, previous, epoch));
+  void elevatorQueue;
+  void reconcile();
+}
 
 async function reconcile() {
   if (reconciling) {
@@ -36,11 +77,13 @@ async function reconcile() {
 }
 
 async function startReconciliation() {
+  sceneEpoch += 1;
   unsubscribeItems?.(); unsubscribeMetadata?.();
   latestMetadataState = undefined;
   if (!(await OBR.scene.isReady())) return;
   latestMetadataState = stateFromMetadata(await OBR.scene.getMetadata());
-  unsubscribeItems = OBR.scene.items.onChange(() => { void reconcile(); });
+  previousTokenPositions = snapshotTokenPositions(await OBR.scene.items.getItems());
+  unsubscribeItems = OBR.scene.items.onChange(handleItemsChanged);
   unsubscribeMetadata = OBR.scene.onMetadataChange((metadata) => {
     latestMetadataState = stateFromMetadata(metadata);
     void reconcile();
@@ -69,6 +112,28 @@ OBR.onReady(async () => {
       height: 168,
     },
   });
+  await OBR.contextMenu.create({
+    id: ELEVATOR_CONTEXT_MENU_ID,
+    icons: [
+      {
+        icon: `/elevator.svg?v=${import.meta.env.VITE_RELEASE_VERSION}`,
+        label: "Edit Elevator…",
+        filter: { min: 1, max: 1, permissions: ["UPDATE"], roles: ["GM"], every: [
+          { key: "type", value: "SHAPE" },
+          { key: ["metadata", ELEVATOR_METADATA_KEY], value: undefined, operator: "!=" },
+        ] },
+      },
+      {
+        icon: `/elevator.svg?v=${import.meta.env.VITE_RELEASE_VERSION}`,
+        label: "Configure Elevator…",
+        filter: { min: 1, max: 1, permissions: ["UPDATE"], roles: ["GM"], every: [{ key: "type", value: "SHAPE" }] },
+      },
+    ],
+    embed: {
+      url: new URL(`/elevator-menu.html?v=${import.meta.env.VITE_RELEASE_VERSION}`, window.location.origin).href,
+      height: 240,
+    },
+  });
 });
 
 window.addEventListener("beforeunload", () => {
@@ -76,6 +141,7 @@ window.addEventListener("beforeunload", () => {
     return;
   }
   void OBR.contextMenu.remove(SEND_CONTEXT_MENU_ID);
+  void OBR.contextMenu.remove(ELEVATOR_CONTEXT_MENU_ID);
   unsubscribeItems?.();
   unsubscribeMetadata?.();
 });

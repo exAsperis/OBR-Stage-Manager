@@ -57,6 +57,7 @@ export default defineConfig({
         extension: resolve(__dirname, 'extension.html'),
         background: resolve(__dirname, 'background.html'),
         sendMenu: resolve(__dirname, 'send-menu.html'),
+        elevatorMenu: resolve(__dirname, 'elevator-menu.html'),
       },
     },
   },

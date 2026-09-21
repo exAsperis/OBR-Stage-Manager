@@ -1,5 +1,6 @@
 import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import {
+  ELEVATOR_METADATA_KEY,
   ITEM_INHERITANCE_METADATA_KEY,
   VIRTUAL_LAYER_METADATA_KEY,
   VIRTUAL_LAYERS_METADATA_KEY,
@@ -44,6 +45,7 @@ import { applyEffectiveItemState } from "./effectiveItemState";
 import { getInheritanceBoundary } from "./inheritanceBoundary";
 import { reorderResolvedStateGroup, reorderResolvedStateGroups, resolveParticipationModel, withStateGroupSelection } from "./participation";
 import { runOutlinerV1NamespaceConversion } from "./namespaceMigration";
+import type { ElevatorConfiguration } from "./elevator";
 
 let queue: Promise<void> = Promise.resolve();
 let writing = false;
@@ -367,6 +369,16 @@ export function assignItems(itemIds: string[], virtualLayerId?: string, nativeLa
     }
     await normalizeLayers(affectedLayers, state);
     await enforceStateInheritance(state);
+  });
+}
+
+export function setElevatorConfiguration(itemId: string, configuration?: ElevatorConfiguration) {
+  return serialized(async () => {
+    await OBR.scene.items.updateItems([itemId], (items) => {
+      if (!items[0]) return;
+      if (configuration) items[0].metadata[ELEVATOR_METADATA_KEY] = configuration;
+      else delete items[0].metadata[ELEVATOR_METADATA_KEY];
+    });
   });
 }
 
