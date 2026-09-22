@@ -4,6 +4,7 @@ import type { Item, Shape } from "@owlbear-rodeo/sdk";
 import { ELEVATOR_METADATA_KEY } from "../src/constants.ts";
 import {
   enteredElevator,
+  elevatorDestinationsEqual,
   getElevatorConfiguration,
   isElevatorActive,
   parseElevatorConfiguration,
@@ -80,6 +81,14 @@ test("native and virtual destinations resolve without considering source layer",
   assert.deepEqual(resolveElevatorDestination({ version: 1, destination: { kind: "native", layer: "PROP" } }, state), { layer: "PROP" });
   assert.deepEqual(resolveElevatorDestination({ version: 1, destination: { kind: "virtual", virtualLayerId: "upper" } }, state), { layer: "CHARACTER", virtualLayerId: "upper" });
   assert.equal(resolveElevatorDestination({ version: 1, destination: { kind: "virtual", virtualLayerId: "deleted" } }, state), undefined);
+});
+
+test("compares configured Elevator destinations by kind and stable identity", () => {
+  assert.equal(elevatorDestinationsEqual({ kind: "native", layer: "CHARACTER" }, { kind: "native", layer: "CHARACTER" }), true);
+  assert.equal(elevatorDestinationsEqual({ kind: "native", layer: "CHARACTER" }, { kind: "native", layer: "PROP" }), false);
+  assert.equal(elevatorDestinationsEqual({ kind: "virtual", virtualLayerId: "upper" }, { kind: "virtual", virtualLayerId: "upper" }), true);
+  assert.equal(elevatorDestinationsEqual({ kind: "virtual", virtualLayerId: "upper" }, { kind: "virtual", virtualLayerId: "lower" }), false);
+  assert.equal(elevatorDestinationsEqual({ kind: "native", layer: "CHARACTER" }, { kind: "virtual", virtualLayerId: "upper" }), false);
 });
 
 test("metadata parsing is defensive and preserves versioned destinations", () => {

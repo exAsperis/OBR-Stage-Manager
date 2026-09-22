@@ -9,6 +9,12 @@ export type ElevatorDestination =
 export type ElevatorConfiguration = { version: 1; destination: ElevatorDestination };
 export type Position = Readonly<{ x: number; y: number }>;
 
+export function elevatorDestinationsEqual(left: ElevatorDestination, right: ElevatorDestination) {
+  return left.kind === right.kind && (left.kind === "native"
+    ? left.layer === (right as Extract<ElevatorDestination, { kind: "native" }>).layer
+    : left.virtualLayerId === (right as Extract<ElevatorDestination, { kind: "virtual" }>).virtualLayerId);
+}
+
 const NATIVE_LAYERS = new Set<Item["layer"]>([
   "MAP", "GRID", "DRAWING", "PROP", "MOUNT", "CHARACTER", "ATTACHMENT",
   "NOTE", "TEXT", "RULER", "FOG", "POINTER", "CONTROL", "POPOVER",

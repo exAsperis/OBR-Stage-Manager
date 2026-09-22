@@ -1,3 +1,4 @@
+import CheckIcon from "@mui/icons-material/CheckRounded";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ElevatorIcon from "@mui/icons-material/ElevatorRounded";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -7,7 +8,7 @@ import Typography from "@mui/material/Typography";
 import OBR, { isShape, type Item } from "@owlbear-rodeo/sdk";
 import { useEffect, useMemo, useState } from "react";
 import { ELEVATOR_METADATA_KEY } from "./constants";
-import { getElevatorConfiguration, resolveElevatorDestination, type ElevatorDestination } from "./elevator";
+import { elevatorDestinationsEqual, getElevatorConfiguration, resolveElevatorDestination, type ElevatorDestination } from "./elevator";
 import { formatLayerName, getOutlinerLayers } from "./layers";
 import { LayerIcon } from "./LayerIcon";
 import { useLayerDisplaySettings } from "./layerSettings";
@@ -48,21 +49,32 @@ export function ElevatorMenuApp() {
     } finally { setBusy(false); }
   }
 
+  function isConfigured(destination: ElevatorDestination) {
+    return configuration ? elevatorDestinationsEqual(configuration.destination, destination) : false;
+  }
+
   return <div id="menu-viewport"><div id="send-menu" role="menu" aria-label="Elevator destination">
     {item && <Typography variant="caption" sx={{ display: "block", px: 1.5, py: .5 }}>
       {configuration ? `Elevator: ${valid ? "configured" : "destination missing"}` : "Configure as Elevator"}
     </Typography>}
-    {layers.map((layer) => <div className="layer-group" key={layer}>
-      <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void save({ kind: "native", layer })}>
+    {layers.map((layer) => {
+      const nativeDestination = { kind: "native", layer } as const;
+      const nativeConfigured = isConfigured(nativeDestination);
+      return <div className="layer-group" key={layer}>
+      <ListItemButton dense role="menuitem" aria-current={nativeConfigured ? "true" : undefined} selected={nativeConfigured} disabled={busy} onClick={() => void save(nativeDestination)}>
         <ListItemIcon sx={{ minWidth: 32 }}><LayerIcon layer={layer} /></ListItemIcon><ListItemText primary={formatLayerName(layer)} />
+        {nativeConfigured && <CheckIcon color="primary" fontSize="small" />}
       </ListItemButton>
       {orderedGroupIds(state, layer).filter((id) => id !== UNASSIGNED_ID).map((id) => {
         const definition = state.layers.find((entry) => entry.id === id);
-        return definition && <ListItemButton dense role="menuitem" className="virtual-layer" disabled={busy} key={id} onClick={() => void save({ kind: "virtual", virtualLayerId: id })}>
+        const destination = { kind: "virtual", virtualLayerId: id } as const;
+        const configured = isConfigured(destination);
+        return definition && <ListItemButton dense role="menuitem" aria-current={configured ? "true" : undefined} selected={configured} className="virtual-layer" disabled={busy} key={id} onClick={() => void save(destination)}>
           <ListItemIcon sx={{ minWidth: 32 }}><ElevatorIcon fontSize="small" /></ListItemIcon><ListItemText primary={definition.name} />
+          {configured && <CheckIcon color="primary" fontSize="small" />}
         </ListItemButton>;
       })}
-    </div>)}
+    </div>})}
     {configuration && <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void save()}>
       <ListItemIcon sx={{ minWidth: 32 }}><DeleteOutlineIcon fontSize="small" /></ListItemIcon><ListItemText primary="Disable Elevator" />
     </ListItemButton>}
