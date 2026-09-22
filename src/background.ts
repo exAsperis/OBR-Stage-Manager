@@ -1,6 +1,6 @@
-import OBR, { isShape, type Item } from "@owlbear-rodeo/sdk";
+import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import { ELEVATOR_METADATA_KEY, EXTENSION_ID } from "./constants";
-import { enteredElevator, getElevatorConfiguration, isElevatorActive, isElevatorSubject, resolveElevatorDestination, selectWinningElevator, type Position } from "./elevator";
+import { enteredElevator, getElevatorConfiguration, isElevatorActive, isElevatorSubject, resolveElevatorDestination, selectWinningElevator, usesPreciseElevatorGeometry, type Position } from "./elevator";
 import { hasBoundaryViolation, stateFromMetadata, type VirtualLayerState } from "./virtualLayers";
 import { assignItems, enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers } from "./virtualLayerService";
 import { isAuthoritativeRole, retainExistingSelection, selectedSuppressedItemIds } from "./selectionSuppression";
@@ -28,12 +28,21 @@ async function processElevators(items: Item[], previous: ReadonlyMap<string, Pos
   if (epoch !== sceneEpoch) return;
   if (!(await OBR.scene.isReady()) || !isAuthoritativeRole(await OBR.player.getRole())) return;
   const state = latestMetadataState ?? stateFromMetadata(await OBR.scene.getMetadata());
-  const elevators = items.filter(isShape).filter((item) => getElevatorConfiguration(item) && isElevatorActive(item));
+  const configured = items.filter((item) => getElevatorConfiguration(item) && item.scale.x !== 0 && item.scale.y !== 0);
+  const fallbackBounds = new Map<string, Awaited<ReturnType<typeof OBR.scene.items.getItemBounds>>>();
+  await Promise.all(configured.filter((item) => !usesPreciseElevatorGeometry(item)).map(async (item) => {
+    try {
+      fallbackBounds.set(item.id, await OBR.scene.items.getItemBounds([item.id]));
+    } catch (error) {
+      console.error(`Stage Manager could not determine the bounds of Elevator ${item.id}.`, error);
+    }
+  }));
+  const elevators = configured.filter((item) => isElevatorActive(item, fallbackBounds.get(item.id)));
   for (const token of items.filter(isElevatorSubject)) {
     if (epoch !== sceneEpoch) return;
     const prior = previous.get(token.id);
     const winner = selectWinningElevator(elevators.filter((elevator) =>
-      elevator.id !== token.id && enteredElevator(elevator, prior, token.position)));
+      elevator.id !== token.id && enteredElevator(elevator, prior, token.position, fallbackBounds.get(elevator.id))));
     if (!winner) continue;
     const configuration = getElevatorConfiguration(winner);
     if (!configuration) continue;
@@ -149,14 +158,13 @@ OBR.onReady(async () => {
         icon: `/elevator.svg?v=${import.meta.env.VITE_RELEASE_VERSION}`,
         label: "Edit Elevator…",
         filter: { min: 1, max: 1, permissions: ["UPDATE"], roles: ["GM"], every: [
-          { key: "type", value: "SHAPE" },
           { key: ["metadata", ELEVATOR_METADATA_KEY], value: undefined, operator: "!=" },
         ] },
       },
       {
         icon: `/elevator.svg?v=${import.meta.env.VITE_RELEASE_VERSION}`,
         label: "Configure Elevator…",
-        filter: { min: 1, max: 1, permissions: ["UPDATE"], roles: ["GM"], every: [{ key: "type", value: "SHAPE" }] },
+        filter: { min: 1, max: 1, permissions: ["UPDATE"], roles: ["GM"] },
       },
     ],
     embed: {

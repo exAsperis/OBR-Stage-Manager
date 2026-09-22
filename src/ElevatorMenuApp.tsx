@@ -5,7 +5,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Typography from "@mui/material/Typography";
-import OBR, { isShape, type Item } from "@owlbear-rodeo/sdk";
+import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import { useEffect, useMemo, useState } from "react";
 import { ELEVATOR_METADATA_KEY } from "./constants";
 import { elevatorDestinationsEqual, getElevatorConfiguration, resolveElevatorDestination, type ElevatorDestination } from "./elevator";
@@ -31,7 +31,7 @@ export function ElevatorMenuApp() {
       const selectedId = selection?.length === 1 ? selection[0] : undefined;
       const selected = selectedId ? (await OBR.scene.items.getItems((entry) => entry.id === selectedId))[0] : undefined;
       if (!active) return;
-      if (!selected || !isShape(selected)) setError("Select one shape to configure an Elevator.");
+      if (!selected) setError("Select one item to configure an Elevator.");
       else setItem(selected);
       setState(nextState);
     }, () => active && setError("Unable to load Elevator settings."));

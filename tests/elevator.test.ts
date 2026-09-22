@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Item, Shape } from "@owlbear-rodeo/sdk";
+import type { BoundingBox, Image, Item, Path, PathCommand, Shape } from "@owlbear-rodeo/sdk";
 import { ELEVATOR_METADATA_KEY } from "../src/constants.ts";
 import {
   enteredElevator,
   elevatorDestinationsEqual,
   getElevatorConfiguration,
   isElevatorActive,
+  isSupportedElevatorTrigger,
   parseElevatorConfiguration,
   pointInShape,
+  pointInBounds,
+  pointInElevatorTrigger,
+  polygonVertices,
   positionChanged,
   resolveElevatorDestination,
   selectWinningElevator,
@@ -26,6 +30,32 @@ function shape(overrides: Partial<Shape> = {}): Shape {
   };
 }
 
+function path(commands: number[][], overrides: Partial<Path> = {}): Path {
+  return {
+    id: "polygon", type: "PATH", name: "Polygon", visible: true, locked: false,
+    createdUserId: "gm", zIndex: 1, lastModified: "", lastModifiedUserId: "gm",
+    position: { x: 0, y: 0 }, rotation: 0, scale: { x: 1, y: 1 }, metadata: {},
+    layer: "DRAWING", commands: commands as PathCommand[], fillRule: "nonzero",
+    style: { fillColor: "#000", fillOpacity: 1, strokeColor: "#000", strokeOpacity: 1, strokeWidth: 1, strokeDash: [] },
+    ...overrides,
+  };
+}
+
+function image(overrides: Partial<Image> = {}): Image {
+  return {
+    id: "image-elevator", type: "IMAGE", name: "Image Elevator", visible: true, locked: false,
+    createdUserId: "gm", zIndex: 1, lastModified: "", lastModifiedUserId: "gm",
+    position: { x: 0, y: 0 }, rotation: 0, scale: { x: 1, y: 1 }, metadata: {},
+    layer: "PROP", image: { url: "image.png", width: 100, height: 100, mime: "image/png" },
+    grid: { dpi: 100, offset: { x: 0, y: 0 } },
+    ...overrides,
+  };
+}
+
+const BOUNDS: BoundingBox = { min: { x: 10, y: 20 }, max: { x: 110, y: 70 }, width: 100, height: 50, center: { x: 60, y: 45 } };
+
+const CONCAVE_POLYGON = [[0, 0, 0], [1, 100, 0], [1, 100, 100], [1, 50, 50], [1, 0, 100], [5]];
+
 const state: VirtualLayerState = {
   version: 1,
   layers: [{ id: "upper", name: "Upper", obrLayer: "CHARACTER" }],
@@ -35,7 +65,7 @@ test("only an outside to inside position change enters", () => {
   const elevator = shape();
   assert.equal(enteredElevator(elevator, { x: -1, y: 50 }, { x: 0, y: 50 }), true);
   assert.equal(enteredElevator(elevator, { x: 20, y: 20 }, { x: 30, y: 30 }), false);
-  assert.equal(enteredElevator(elevator, { x: 20, y: 20 }, { x: -1, y: 20 }), false);
+  assert.equal(enteredElevator(elevator, { x: 20, y: 20 }, { x: -51, y: 20 }), false);
   assert.equal(enteredElevator(elevator, { x: 20, y: 20 }, { x: 20, y: 20 }), false);
 });
 
@@ -47,8 +77,8 @@ test("non-position updates and startup snapshots cannot enter", () => {
 
 test("leaving rearms a token for a later re-entry", () => {
   const elevator = shape();
-  assert.equal(enteredElevator(elevator, { x: 10, y: 10 }, { x: -10, y: 10 }), false);
-  assert.equal(enteredElevator(elevator, { x: -10, y: 10 }, { x: 10, y: 10 }), true);
+  assert.equal(enteredElevator(elevator, { x: 10, y: 10 }, { x: -60, y: 10 }), false);
+  assert.equal(enteredElevator(elevator, { x: -60, y: 10 }, { x: 10, y: 10 }), true);
 });
 
 test("zero effective scale and degenerate shapes are inactive", () => {
@@ -58,17 +88,74 @@ test("zero effective scale and degenerate shapes are inactive", () => {
   assert.equal(isElevatorActive(shape({ height: 0 })), false);
 });
 
-test("rotated and scaled rectangle hit testing includes its boundary", () => {
+test("rectangles use their OBR top-left origin and honor rotation, scale, and boundaries", () => {
   const elevator = shape({ width: 20, height: 10, position: { x: 50, y: 50 }, scale: { x: 2, y: .5 }, rotation: 90 });
   assert.equal(pointInShape(elevator, { x: 47.5, y: 70 }), true);
-  assert.equal(pointInShape(elevator, { x: 44, y: 70 }), false);
+  assert.equal(pointInShape(elevator, { x: 50, y: 50 }), true);
+  assert.equal(pointInShape(elevator, { x: 52.5, y: 70 }), false);
+  assert.equal(pointInShape(shape(), { x: -1, y: 50 }), false);
+  assert.equal(pointInShape(shape(), { x: 100, y: 100 }), true);
 });
 
 test("circle, triangle, and hexagon reject points inside only their AABB", () => {
-  assert.equal(pointInShape(shape({ shapeType: "CIRCLE" }), { x: 1, y: 1 }), false);
-  assert.equal(pointInShape(shape({ shapeType: "TRIANGLE" }), { x: 1, y: 1 }), false);
-  assert.equal(pointInShape(shape({ shapeType: "HEXAGON" }), { x: 1, y: 1 }), false);
+  assert.equal(pointInShape(shape({ shapeType: "CIRCLE" }), { x: 49, y: 49 }), false);
+  assert.equal(pointInShape(shape({ shapeType: "TRIANGLE" }), { x: -49, y: -49 }), false);
+  assert.equal(pointInShape(shape({ shapeType: "HEXAGON" }), { x: 49, y: 49 }), false);
   assert.equal(pointInShape(shape({ shapeType: "CIRCLE" }), { x: 50, y: 0 }), true);
+  assert.equal(pointInShape(shape({ shapeType: "TRIANGLE" }), { x: 0, y: 0 }), true);
+  assert.equal(pointInShape(shape({ shapeType: "HEXAGON" }), { x: 0, y: 0 }), true);
+});
+
+test("closed convex and concave PATH polygons use their actual geometry", () => {
+  const convex = path([[0, -50, -50], [1, 50, -50], [1, 50, 50], [1, -50, 50], [5]]);
+  assert.equal(pointInElevatorTrigger(convex, { x: 0, y: 0 }), true);
+  assert.equal(enteredElevator(convex, { x: -51, y: 0 }, { x: -50, y: 0 }), true);
+  const concave = path(CONCAVE_POLYGON);
+  assert.equal(pointInElevatorTrigger(concave, { x: 20, y: 80 }), true);
+  assert.equal(pointInElevatorTrigger(concave, { x: 50, y: 80 }), false);
+});
+
+test("PATH polygons honor translation, rotation, nonuniform and negative scale, and edges", () => {
+  const polygon = path(
+    [[0, -10, -10], [1, 10, -10], [1, 10, 10], [1, -10, 10], [5]],
+    { position: { x: 100, y: 100 }, rotation: 90, scale: { x: -2, y: .5 } },
+  );
+  assert.equal(pointInElevatorTrigger(polygon, { x: 100, y: 100 }), true);
+  assert.equal(pointInElevatorTrigger(polygon, { x: 95, y: 80 }), true);
+  assert.equal(pointInElevatorTrigger(polygon, { x: 94, y: 80 }), false);
+});
+
+test("rejects open, curved, malformed, multi-contour, and zero-area PATH items", () => {
+  const rejected = [
+    path([[0, 0, 0], [1, 10, 0], [1, 0, 10]]),
+    path([[0, 0, 0], [1, 10, 0], [2, 10, 10, 0, 10], [5]]),
+    path([[1, 0, 0], [1, 10, 0], [1, 0, 10], [5]]),
+    path([[0, 0, 0], [1, 10, 0], [0, 20, 20], [1, 30, 20], [5]]),
+    path([[0, 0, 0], [1, 10, 0], [1, 20, 0], [5]]),
+    path([[0, 0, 0], [1, Number.POSITIVE_INFINITY, 0], [1, 0, 10], [5]]),
+  ];
+  for (const candidate of rejected) {
+    assert.equal(polygonVertices(candidate), undefined);
+    assert.equal(isSupportedElevatorTrigger(candidate), false);
+    assert.equal(isElevatorActive(candidate), false);
+    assert.equal(isElevatorActive(candidate, BOUNDS), true);
+    assert.equal(pointInElevatorTrigger(candidate, { x: 10, y: 20 }, BOUNDS), true);
+  }
+});
+
+test("arbitrary items use an inclusive rectangular scene bounding box", () => {
+  const elevator = image();
+  assert.equal(pointInBounds(BOUNDS, { x: 10, y: 20 }), true);
+  assert.equal(pointInElevatorTrigger(elevator, { x: 110, y: 70 }, BOUNDS), true);
+  assert.equal(pointInElevatorTrigger(elevator, { x: 9, y: 45 }, BOUNDS), false);
+  assert.equal(enteredElevator(elevator, { x: 9, y: 45 }, { x: 10, y: 45 }, BOUNDS), true);
+});
+
+test("fallback elevators require nonzero effective scale and nondegenerate bounds", () => {
+  assert.equal(isElevatorActive(image({ scale: { x: 0, y: 1 } }), BOUNDS), false);
+  assert.equal(isElevatorActive(image({ scale: { x: 1, y: 0 } }), BOUNDS), false);
+  assert.equal(isElevatorActive(image(), { ...BOUNDS, width: 0 }), false);
+  assert.equal(isElevatorActive(image(), { ...BOUNDS, height: 0 }), false);
 });
 
 test("overlapping elevators choose z-index then stable ID and only one winner", () => {
@@ -105,8 +192,8 @@ test("metadata parsing is defensive and preserves versioned destinations", () =>
 test("independent tokens can enter during the same scene update", () => {
   const elevator = shape();
   const movements = [
-    [{ x: -1, y: 10 }, { x: 10, y: 10 }],
-    [{ x: 50, y: -1 }, { x: 50, y: 10 }],
+    [{ x: -1, y: 10 }, { x: 0, y: 10 }],
+    [{ x: 10, y: -1 }, { x: 10, y: 0 }],
   ] as const;
   assert.deepEqual(movements.map(([before, after]) => enteredElevator(elevator, before, after)), [true, true]);
 });
