@@ -2,6 +2,9 @@
 
 An enhanced fork of Owlbear Rodeo's [Outliner](https://github.com/owlbear-rodeo/outliner) extension.
 
+## Warning
+This extension allows a GM to bring OBR items "off stage" and "on stage", either individually or as part of virtual layers. Items that are "off stage" are invisible to all, including GMs. The mechanism used to achieve this is to force each item to 0,0 X,Y dimensions. The original dimensions are saved in each item's metadata and used to expand the items when needed. If you remove the Stage Manager extension, any items in an "off-stage" state are not selectable by normal means. You will need to use another extension like Outliner or Outliner+ and restore the correct dimensions manually.
+
 ## Development
 
 ```sh
