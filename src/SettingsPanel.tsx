@@ -13,9 +13,7 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import type { ControlDensity } from "./outlinerLayout";
 
-const FEATURES: Array<{ feature: FeatureSetting; label: string }> = [
-  { feature: "manageInheritance", label: "Manage inheritance" },
-  { feature: "transparency", label: "On-stage / off-stage" },
+const PROPERTY_FEATURES: Array<{ feature: FeatureSetting; label: string }> = [
   { feature: "interaction", label: "Interaction" },
   { feature: "locked", label: "Locked/Unlocked" },
   { feature: "visible", label: "Visible/Hidden" },
@@ -29,9 +27,10 @@ export function SettingsPanel({ editingDensity, controlDensity, onDensityChange 
     <Box id="outliner-settings" component="section" aria-labelledby="features-heading" sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: "divider", bgcolor: "background.paper" }}>
       <Typography id="features-heading" variant="subtitle2" sx={{ mb: 0.5 }}>Features</Typography>
       <FormGroup sx={{ mb: 1 }}>
-        <FeatureToggle feature={FEATURES[0].feature} label={FEATURES[0].label} checked={settings.features.manageInheritance} />
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, ml: 1 }}>Item States</Typography>
-        {FEATURES.slice(1).map(({ feature, label }) => <FeatureToggle key={feature} feature={feature} label={label} checked={settings.features[feature]} nested />)}
+        <FeatureToggle feature="transparency" label="Show on-stage/off-stage button" checked={settings.features.transparency} />
+        <FeatureToggle feature="manageInheritance" label="Manage inheritance" checked={settings.features.manageInheritance} />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>Show property buttons</Typography>
+        {PROPERTY_FEATURES.map(({ feature, label }) => <FeatureToggle key={feature} feature={feature} label={label} checked={settings.features[feature]} />)}
       </FormGroup>
       <Divider sx={{ mx: -2, mb: 1.5 }} />
       <Typography variant="subtitle2" sx={{ mb: 1 }}>Control density</Typography>
@@ -64,11 +63,11 @@ function DensitySelect({ label, value, onChange }: { label: string; value: Contr
   </TextField>;
 }
 
-function FeatureToggle({ feature, label, checked, nested = false }: { feature: FeatureSetting; label: string; checked: boolean; nested?: boolean }) {
+function FeatureToggle({ feature, label, checked }: { feature: FeatureSetting; label: string; checked: boolean }) {
   return <FormControlLabel
     label={label}
     labelPlacement="start"
     control={<Switch size="small" checked={checked} onChange={(_, enabled) => setFeatureEnabled(feature, enabled)} inputProps={{ "aria-label": label }} />}
-    sx={{ justifyContent: "space-between", ml: nested ? 1 : 0, mr: 0, minHeight: 34, "& .MuiFormControlLabel-label": { fontSize: "0.875rem" } }}
+    sx={{ justifyContent: "space-between", ml: 0, mr: 0, minHeight: 34, "& .MuiFormControlLabel-label": { fontSize: "0.875rem" } }}
   />;
 }
