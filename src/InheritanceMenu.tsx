@@ -7,26 +7,23 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/CloseRounded";
-import type { EnforcedItemState, InheritedItemState, StatefulProperty, VirtualInheritance } from "./virtualLayers";
+import type { EffectiveItemState, EnforcedItemState, InheritableProperty, VirtualInheritance } from "./virtualLayers";
 import { setGroupInheritanceMode, setScopeEnforcement, type RuleScope } from "./virtualLayerService";
 import type { FeatureSettings } from "./layerSettings";
-import { inheritanceBoundaryDescription, type InheritanceBoundary } from "./inheritanceBoundary";
 
-const PROPERTIES: Array<{ property: StatefulProperty; feature: keyof FeatureSettings; label: string }> = [
-  { property: "transparent", feature: "transparency", label: "Off-stage" },
+const PROPERTIES: Array<{ property: InheritableProperty; feature: keyof FeatureSettings; label: string }> = [
   { property: "disableHit", feature: "interaction", label: "Click-through" },
   { property: "locked", feature: "locked", label: "Locked" },
   { property: "visible", feature: "visible", label: "Visible" },
 ];
 
-export function InheritanceMenu({ anchorEl, scope, config, enforce, displayed, features, boundary, onClose }: {
+export function InheritanceMenu({ anchorEl, scope, config, enforce, displayed, features, onClose }: {
   anchorEl: HTMLElement | null;
   scope: RuleScope;
   config?: VirtualInheritance;
   enforce: EnforcedItemState;
-  displayed: InheritedItemState;
+  displayed: EffectiveItemState;
   features: FeatureSettings;
-  boundary?: InheritanceBoundary;
   onClose: () => void;
 }) {
   const independent = config?.mode === "independent";
@@ -48,10 +45,7 @@ export function InheritanceMenu({ anchorEl, scope, config, enforce, displayed, f
         <CloseIcon fontSize="small" />
       </IconButton>
     </Box>
-    {boundary && <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, pb: 0.5 }}>
-      {inheritanceBoundaryDescription(boundary)}
-    </Typography>}
-    {scope.kind === "group" && !boundary && <>
+    {scope.kind === "group" && <>
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 0.5, pb: 0.5 }}>Mode</Typography>
       <ToggleButtonGroup
         exclusive
@@ -66,7 +60,7 @@ export function InheritanceMenu({ anchorEl, scope, config, enforce, displayed, f
         <ToggleButton value="independent">Independent</ToggleButton>
       </ToggleButtonGroup>
     </>}
-    {(scope.kind === "native" || (independent && !boundary)) && <Box component="fieldset" sx={{ border: 0, p: 0, m: 0, width: "100%" }}>
+    {(scope.kind === "native" || independent) && <Box component="fieldset" sx={{ border: 0, p: 0, m: 0, width: "100%" }}>
       <Typography component="legend" variant="caption" color="text.secondary" sx={{ px: 0.5 }}>Enforce</Typography>
       {PROPERTIES.filter(({ feature }) => features[feature]).map(({ property, label }) => <FormControlLabel
         key={property}

@@ -1,7 +1,6 @@
 import type { Item } from "@owlbear-rodeo/sdk";
 import type { StackOperation } from "./stacking";
 import { canonicalizeVirtualLayerName, canonicalVirtualLayerIdentity, parseVirtualLayerPath } from "./virtualLayerName.ts";
-import { withoutBoundaryInheritance } from "./inheritanceBoundary.ts";
 import { LEGACY_V1_VIRTUAL_LAYERS_METADATA_KEY, LEGACY_VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYERS_METADATA_KEY, VIRTUAL_LAYER_METADATA_KEY } from "./constants.ts";
 import { isMigratableOutlinerV0Document, isMigratableOutlinerV1Document } from "./namespaceMigration.ts";
 
@@ -12,15 +11,16 @@ export interface VirtualLayerDefinition {
   order: number;
 }
 
-export interface InheritedItemState {
+export interface EffectiveItemState {
   disableHit: boolean;
   locked: boolean;
   visible: boolean;
   transparent: boolean;
 }
 
-export type StatefulProperty = keyof InheritedItemState;
-export type EnforcedItemState = Partial<InheritedItemState>;
+export type InheritableProperty = "disableHit" | "locked" | "visible";
+export type StatefulProperty = keyof EffectiveItemState;
+export type EnforcedItemState = Partial<Pick<EffectiveItemState, InheritableProperty>>;
 export type VirtualInheritance = { mode: "pass-through" } | { mode: "independent"; enforce: EnforcedItemState };
 
 export interface StateInheritanceRules {
@@ -37,13 +37,16 @@ export interface VirtualLayerState {
   stateGroupOrder?: string[];
   /** Normalized state name, or null when every state in the group is suppressed. */
   stateSelections?: Record<string, string | null>;
+  /** Explicit participation overrides for non-stateful logical layers. False means manually offstage. */
+  participationOverrides?: Record<string, false>;
   inheritance?: StateInheritanceRules;
 }
 
 export type VirtualLayerItem = Pick<Item, "id" | "layer" | "zIndex" | "metadata">;
 export const UNASSIGNED_ID = "__unassigned__";
 export const EMPTY_VIRTUAL_LAYER_STATE: VirtualLayerState = { version: 3, layers: [] };
-export const STATEFUL_PROPERTIES: StatefulProperty[] = ["transparent", "disableHit", "locked", "visible"];
+export const INHERITABLE_PROPERTIES: InheritableProperty[] = ["disableHit", "locked", "visible"];
+export const STATEFUL_PROPERTIES: StatefulProperty[] = ["transparent", ...INHERITABLE_PROPERTIES];
 
 const isLayer = (value: unknown): value is Item["layer"] => typeof value === "string" && [
   "MAP", "GRID", "DRAWING", "PROP", "MOUNT", "CHARACTER", "ATTACHMENT",
@@ -53,8 +56,8 @@ const isLayer = (value: unknown): value is Item["layer"] => typeof value === "st
 function parseEnforcedState(value: unknown): EnforcedItemState | undefined {
   if (!value || typeof value !== "object") return undefined;
   const parsed: EnforcedItemState = {};
-  for (const property of STATEFUL_PROPERTIES) {
-    const candidate = (value as Partial<InheritedItemState>)[property];
+  for (const property of INHERITABLE_PROPERTIES) {
+    const candidate = (value as Partial<EffectiveItemState>)[property];
     if (typeof candidate === "boolean") parsed[property] = candidate;
   }
   return parsed;
@@ -129,10 +132,16 @@ export function parseVirtualLayerState(value: unknown): VirtualLayerState {
   const stateGroupOrder = Array.isArray(rawStateGroupOrder)
     ? [...new Set(rawStateGroupOrder.filter((entry): entry is string => typeof entry === "string" && Boolean(entry.trim())).map((entry) => entry.trim().toLocaleLowerCase()))]
     : [];
-  return withoutBoundaryInheritance({ version: 3, layers, ...(Object.keys(unassignedOrders).length ? { unassignedOrders } : {}),
+  const rawParticipation = (value as { participationOverrides?: unknown }).participationOverrides;
+  const participationOverrides: Record<string, false> = {};
+  if (rawParticipation && typeof rawParticipation === "object") for (const [id, participating] of Object.entries(rawParticipation)) {
+    if (id && participating === false) participationOverrides[id] = false;
+  }
+  return { version: 3, layers, ...(Object.keys(unassignedOrders).length ? { unassignedOrders } : {}),
     ...(Object.keys(stateOrders).length ? { stateOrders } : {}),
     ...(stateGroupOrder.length ? { stateGroupOrder } : {}),
-    ...(Object.keys(stateSelections).length ? { stateSelections } : {}), ...(inheritance ? { inheritance } : {}) });
+    ...(Object.keys(stateSelections).length ? { stateSelections } : {}),
+    ...(Object.keys(participationOverrides).length ? { participationOverrides } : {}), ...(inheritance ? { inheritance } : {}) };
 }
 
 export function stateFromMetadata(metadata: Record<string, unknown>) {
@@ -294,13 +303,13 @@ export function createVirtualLayer(state: VirtualLayerState, obrLayer: Item["lay
   const groups = orderedGroupIds(next, obrLayer).filter((groupId) => groupId !== id);
   const unassignedIndex = groups.indexOf(UNASSIGNED_ID);
   groups.splice(unassignedIndex < 0 ? groups.length : unassignedIndex, 0, id);
-  return withoutBoundaryInheritance(applyGroupOrder(next, obrLayer, groups));
+  return applyGroupOrder(next, obrLayer, groups);
 }
 
 export function renameVirtualLayer(state: VirtualLayerState, id: string, name: string): VirtualLayerState {
   if (!state.layers.some((entry) => entry.id === id)) throw new Error("Virtual layer does not exist.");
   const validName = validateName(name);
-  return withoutBoundaryInheritance({ ...state, layers: state.layers.map((entry) => entry.id === id ? { ...entry, name: validName } : entry) });
+  return { ...state, layers: state.layers.map((entry) => entry.id === id ? { ...entry, name: validName } : entry) };
 }
 
 export function renameLinkedVirtualLayers(state: VirtualLayerState, id: string, name: string): VirtualLayerState {
@@ -310,7 +319,7 @@ export function renameLinkedVirtualLayers(state: VirtualLayerState, id: string, 
   const validName = validateName(name);
   const currentName = validateName(target!.name);
   const dependentIds = new Set(dependentVirtualLayers(state, id).map((layer) => layer.id));
-  return withoutBoundaryInheritance({ ...state,
+  return { ...state,
     layers: state.layers.map((entry) => {
       if (linkedIds.has(entry.id)) return { ...entry, name: validName };
       if (dependentIds.has(entry.id)) {
@@ -319,7 +328,7 @@ export function renameLinkedVirtualLayers(state: VirtualLayerState, id: string, 
       }
       return entry;
     }),
-  });
+  };
 }
 
 export function deleteVirtualLayer(state: VirtualLayerState, id: string): VirtualLayerState {

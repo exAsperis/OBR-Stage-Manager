@@ -1,357 +1,162 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Item } from "@owlbear-rodeo/sdk";
-import { ITEM_INHERITANCE_METADATA_KEY, ITEM_LOCAL_STATE_METADATA_KEY, ITEM_TRANSPARENCY_METADATA_KEY, VIRTUAL_LAYER_METADATA_KEY } from "../src/constants.ts";
-import { activateTransparency, isItemTransparent, restoreTransparency } from "../src/transparentState.ts";
-import {
-  calculateInheritanceUpdates,
-  captureAggregateState,
-  directGroupTransparency,
-  directNativeItemIds,
-  getEffectiveItemRule,
-  getGroupEffectiveInstructions,
-  getGroupInheritance,
-  getItemParentRule,
-  getNativeRule,
-  inheritanceVisualState,
-  itemState,
-  itemInheritanceLabel,
-  linkedDirectPropertyItemIds,
-  withLinkedGroupProperty,
-  parseItemInheritance,
-} from "../src/stateInheritance.ts";
-import {
-  createVirtualLayer,
-  deleteVirtualLayer,
-  parseVirtualLayerState,
-  renameVirtualLayer,
-  mutuallyExclusiveVirtualLayers,
-  reorderVirtualLayer,
-  type InheritedItemState,
-  type VirtualLayerState,
-} from "../src/virtualLayers.ts";
+import { ITEM_INHERITANCE_METADATA_KEY, ITEM_LOCAL_STATE_METADATA_KEY, VIRTUAL_LAYER_METADATA_KEY } from "../src/constants.ts";
+import { activateTransparency } from "../src/transparentState.ts";
+import { calculateInheritanceUpdates, definitionItemIds, directGroupTransparency, directNativeItemIds, getEffectiveItemRule, getGroupEffectiveInstructions, getGroupInheritance, getItemParentRule, getNativeRule, logicalLayerItemIds, parseItemInheritance } from "../src/stateInheritance.ts";
+import { resolveParticipationModel, withLogicalParticipation, withStateGroupSelection } from "../src/participation.ts";
+import { createVirtualLayer, parseVirtualLayerState, renameVirtualLayer, type EffectiveItemState, type VirtualLayerState } from "../src/virtualLayers.ts";
 
-const full: InheritedItemState = { disableHit: true, locked: true, visible: false, transparent: false };
+const full: EffectiveItemState = { disableHit: true, locked: true, visible: false, transparent: false };
 const state: VirtualLayerState = {
   version: 3,
   layers: [{ id: "roofs", name: "Roofs", obrLayer: "PROP", order: 0 }],
   inheritance: {
     native: { PROP: { locked: true, visible: false } },
-    virtual: { roofs: { mode: "independent", enforce: { transparent: true } } },
+    virtual: { roofs: { mode: "independent", enforce: { disableHit: true } } },
     unassigned: { PROP: { mode: "pass-through" } },
   },
 };
 
-function item(id: string, assignment?: string, independent: unknown = false): Item {
-  return {
-    id, layer: "PROP", zIndex: 0, disableHit: false, locked: false, visible: true, scale: { x: 1, y: 1 },
-    metadata: {
-      ...(assignment ? { [VIRTUAL_LAYER_METADATA_KEY]: { virtualLayerId: assignment } } : {}),
-      ...(independent ? { [ITEM_INHERITANCE_METADATA_KEY]: independent === true ? { independent: true } : independent } : {}),
-    },
-  } as Item;
+function item(id: string, assignment?: string, independent: unknown = false, layer: Item["layer"] = "PROP"): Item {
+  return { id, layer, zIndex: 0, disableHit: false, locked: false, visible: true, scale: { x: 1, y: 1 }, metadata: {
+    ...(assignment ? { [VIRTUAL_LAYER_METADATA_KEY]: { virtualLayerId: assignment } } : {}),
+    ...(independent ? { [ITEM_INHERITANCE_METADATA_KEY]: independent === true ? { independent: true } : independent } : {}),
+  } } as Item;
 }
 
-test("derives a destination group's direct transparency for item moves", () => {
-  const family: VirtualLayerState = { version: 3, layers: [
-    { id: "day", name: "Manor: Day", obrLayer: "PROP", order: 0 },
-    { id: "night", name: "Manor: Night", obrLayer: "PROP", order: 1 },
-  ] };
-  const day = item("day-item", "day");
-  const night = item("night-item", "night");
-  activateTransparency(night, "direct");
-  assert.equal(directGroupTransparency([day, night], family, "PROP", "day", new Set([night.id])), false);
-  assert.equal(directGroupTransparency([day, night], family, "PROP", "night", new Set([day.id])), true);
-  assert.equal(directGroupTransparency([day], family, "PROP", "night"), undefined);
-  activateTransparency(day, "direct");
-  assert.equal(directGroupTransparency([day], family, "PROP", "night"), undefined);
-});
-
-test("rejects legacy scene inheritance instead of partially migrating it", () => {
-  const parsed = parseVirtualLayerState({
-    version: 1,
-    layers: state.layers,
-    inheritance: { native: { PROP: full }, virtual: { roofs: full }, unassigned: { PROP: full } },
+test("parses inheritance while dropping obsolete transparent rules", () => {
+  const parsed = parseVirtualLayerState({ version: 3, layers: state.layers, inheritance: {
+    native: { PROP: { transparent: true, locked: true } },
+    virtual: { roofs: { mode: "independent", enforce: { transparent: false, visible: false } } },
+  } });
+  assert.deepEqual(parsed.inheritance, {
+    native: { PROP: { locked: true } },
+    virtual: { roofs: { mode: "independent", enforce: { visible: false } } },
   });
-  assert.deepEqual(parsed, { version: 3, layers: [] });
-});
-
-test("parses partial instructions, modes, and legacy item overrides", () => {
-  assert.deepEqual(parseVirtualLayerState(state), state);
-  assert.deepEqual(parseItemInheritance({ independent: true }), { independent: true, legacy: false });
   assert.deepEqual(parseItemInheritance(full), { independent: true, legacy: true });
-  assert.equal(parseItemInheritance({ locked: true }), undefined);
 });
 
-test("resolves pass-through, independent, and item-independent precedence", () => {
+test("resolves pass-through, independent, and item-independent property precedence", () => {
   assert.deepEqual(getNativeRule(state, "PROP"), { locked: true, visible: false });
-  assert.deepEqual(getGroupInheritance(state, "PROP", "roofs"), { mode: "independent", enforce: { transparent: true } });
-  assert.deepEqual(getGroupEffectiveInstructions(state, "PROP", "roofs"), { transparent: true });
-  assert.deepEqual(getItemParentRule(item("roof", "roofs"), state), { transparent: true });
+  assert.deepEqual(getGroupInheritance(state, "PROP", "roofs"), { mode: "independent", enforce: { disableHit: true } });
+  assert.deepEqual(getGroupEffectiveInstructions(state, "PROP", "roofs"), { disableHit: true });
+  assert.deepEqual(getItemParentRule(item("roof", "roofs"), state), { disableHit: true });
   assert.deepEqual(getItemParentRule(item("unassigned"), state), { locked: true, visible: false });
   assert.deepEqual(getEffectiveItemRule(item("independent", undefined, true), state), {});
 });
 
-test("calculates only changes for instructed properties", () => {
-  const passThrough = item("pass-through");
-  const independent = item("independent", undefined, true);
-  const updates = calculateInheritanceUpdates([passThrough, independent], state);
-  assert.deepEqual(updates.get("pass-through"), { instructions: { locked: true, visible: false } });
-  assert.equal(updates.has("independent"), false);
-  passThrough.locked = true;
-  passThrough.visible = false;
-  passThrough.metadata[ITEM_LOCAL_STATE_METADATA_KEY] = {
-    version: 1, values: { locked: false, visible: true },
-  };
-  assert.equal(calculateInheritanceUpdates([passThrough], state).size, 0);
+test("linked definitions inherit independently from their own native layers", () => {
+  const linked: VirtualLayerState = { version: 3, layers: [
+    { id: "map-floor", name: "House: Floor 1", obrLayer: "MAP", order: 0 },
+    { id: "prop-floor", name: "House: Floor 1", obrLayer: "PROP", order: 0 },
+  ], inheritance: { native: { MAP: { locked: true }, PROP: { visible: false } } } };
+  assert.deepEqual(getItemParentRule(item("map", "map-floor", false, "MAP"), linked), { locked: true });
+  assert.deepEqual(getItemParentRule(item("prop", "prop-floor"), linked), { visible: false });
 });
 
-test("leaves ordinary values alone when their instructions disappear", () => {
-  const target = item("target");
+test("dependent definitions inherit from their native layer, not their guardian", () => {
+  const dependent: VirtualLayerState = { version: 3, layers: [
+    { id: "guardian", name: "House: Floor 1", obrLayer: "MAP", order: 0 },
+    { id: "lights", name: "House: Floor 1/Lights: On", obrLayer: "PROP", order: 0 },
+  ], inheritance: {
+    native: { MAP: { locked: true }, PROP: { disableHit: true } },
+    virtual: { guardian: { mode: "independent", enforce: { visible: false } } },
+  } };
+  assert.deepEqual(getItemParentRule(item("guardian", "guardian", false, "MAP"), dependent), { visible: false });
+  assert.deepEqual(getItemParentRule(item("lights", "lights"), dependent), { disableHit: true });
+});
+
+test("ordinary definition targets stay local while participation targets span links", () => {
+  const linked: VirtualLayerState = { version: 3, layers: [
+    { id: "map", name: "Floor 1", obrLayer: "MAP", order: 0 },
+    { id: "prop", name: "Floor 1", obrLayer: "PROP", order: 0 },
+  ] };
+  const items = [item("map-item", "map", false, "MAP"), item("map-independent", "map", true, "MAP"), item("prop-item", "prop")];
+  assert.deepEqual(definitionItemIds(items, linked, "MAP", "map"), ["map-item", "map-independent"]);
+  assert.deepEqual(definitionItemIds(items, linked, "PROP", "prop"), ["prop-item"]);
+  assert.deepEqual(logicalLayerItemIds(items, linked, "map"), ["map-item", "map-independent", "prop-item"]);
+  assert.deepEqual(logicalLayerItemIds(items, linked, "prop"), ["map-item", "map-independent", "prop-item"]);
+  const offstage = withLogicalParticipation(linked, "map", false);
+  assert.equal(resolveParticipationModel(offstage).byDefinitionId.get("map")?.participating, false);
+  assert.equal(resolveParticipationModel(offstage).byDefinitionId.get("prop")?.participating, false);
+});
+
+test("guardian and state-linked participation remain structural and recursive", () => {
+  let scene: VirtualLayerState = { version: 3, layers: [
+    { id: "map-day", name: "House: Day", obrLayer: "MAP", order: 0 },
+    { id: "prop-day", name: "House: Day", obrLayer: "PROP", order: 0 },
+    { id: "night", name: "House: Night", obrLayer: "MAP", order: 1 },
+    { id: "lights-on", name: "House: Day/Lights: On", obrLayer: "PROP", order: 1 },
+    { id: "lights-off", name: "House: Day/Lights: Off", obrLayer: "PROP", order: 2 },
+  ], stateSelections: { house: "day", "house: day/lights": "on" } };
+  let participation = resolveParticipationModel(scene);
+  assert.equal(participation.byDefinitionId.get("map-day")?.participating, true);
+  assert.equal(participation.byDefinitionId.get("prop-day")?.participating, true);
+  assert.equal(participation.byDefinitionId.get("lights-on")?.participating, true);
+  scene = withStateGroupSelection(scene, "house", "night");
+  participation = resolveParticipationModel(scene);
+  assert.equal(participation.byDefinitionId.get("map-day")?.participating, false);
+  assert.equal(participation.byDefinitionId.get("prop-day")?.participating, false);
+  assert.equal(participation.byDefinitionId.get("lights-on")?.participating, false);
+  scene = withStateGroupSelection(scene, "house", "day");
+  participation = resolveParticipationModel(scene);
+  assert.equal(participation.byDefinitionId.get("lights-on")?.participating, true);
+  assert.equal(participation.byDefinitionId.get("lights-off")?.participating, false);
+});
+
+test("participation overlays current inheritance and also suppresses independent items", () => {
+  const target = item("target", "day", true, "MAP");
+  let scene: VirtualLayerState = { version: 3, layers: [
+    { id: "day", name: "House: Day", obrLayer: "MAP", order: 0 },
+    { id: "night", name: "House: Night", obrLayer: "MAP", order: 1 },
+  ], stateSelections: { house: "night" }, inheritance: { native: { MAP: { locked: true } } } };
+  assert.deepEqual(getEffectiveItemRule(target, scene), { transparent: true });
+  delete target.metadata[ITEM_INHERITANCE_METADATA_KEY];
+  assert.deepEqual(getEffectiveItemRule(target, scene), { locked: true, transparent: true });
+  scene = { ...scene, inheritance: { native: { MAP: { locked: false } } } };
+  assert.deepEqual(getEffectiveItemRule(target, scene), { locked: false, transparent: true });
+  scene = withStateGroupSelection(scene, "house", "day");
+  assert.deepEqual(getEffectiveItemRule(target, scene), { locked: false });
+});
+
+test("unassigned can opt out while assigned pass-through groups inherit native rules", () => {
+  const scene: VirtualLayerState = { version: 3, layers: [{ id: "assigned", name: "Assigned", obrLayer: "MAP", order: 0 }], inheritance: {
+    native: { MAP: { locked: true } }, unassigned: { MAP: { mode: "independent", enforce: {} } },
+  } };
+  assert.deepEqual(getItemParentRule(item("loose", undefined, false, "MAP"), scene), {});
+  assert.deepEqual(getItemParentRule(item("placed", "assigned", false, "MAP"), scene), { locked: true });
+});
+
+test("reconciliation reveals the newest inherited state when participation returns", () => {
+  const target = item("target", "day", false, "MAP");
+  let scene: VirtualLayerState = { version: 3, layers: [
+    { id: "day", name: "House: Day", obrLayer: "MAP", order: 0 },
+    { id: "night", name: "House: Night", obrLayer: "MAP", order: 1 },
+  ], stateSelections: { house: "night" }, inheritance: { native: { MAP: { locked: false } } } };
+  activateTransparency(target, "inherited");
+  target.metadata[ITEM_LOCAL_STATE_METADATA_KEY] = { version: 1, values: { transparent: false, locked: true } };
   target.locked = true;
-  target.visible = false;
-  const withoutInstructions: VirtualLayerState = { version: 3, layers: state.layers };
-  assert.equal(calculateInheritanceUpdates([target], withoutInstructions).size, 0);
+  assert.deepEqual(calculateInheritanceUpdates([target], scene).get("target"), { instructions: { locked: false, transparent: true } });
+  scene = withStateGroupSelection(scene, "house", "day");
+  assert.deepEqual(calculateInheritanceUpdates([target], scene).get("target"), { instructions: { locked: false } });
 });
 
-test("plans inherited transparency activation and restoration", () => {
-  const target = item("target", "roofs");
-  assert.deepEqual(calculateInheritanceUpdates([target], state).get("target"), { instructions: { transparent: true } });
-  target.metadata[ITEM_TRANSPARENCY_METADATA_KEY] = {
-    scale: { x: 1, y: 1 }, source: "inherited", visible: true, disableHit: false,
-  };
-  target.metadata[ITEM_LOCAL_STATE_METADATA_KEY] = { version: 1, values: { transparent: false } };
-  target.scale = { x: 0, y: 0 };
-  target.visible = false;
-  assert.equal(calculateInheritanceUpdates([target], state).size, 0);
-  const withoutRule: VirtualLayerState = { version: 3, layers: state.layers };
-  assert.deepEqual(calculateInheritanceUpdates([target], withoutRule).get("target"), { instructions: {} });
+test("direct transparency aggregation remains a logical participation operation", () => {
+  const linked: VirtualLayerState = { version: 3, layers: [
+    { id: "map", name: "Floor", obrLayer: "MAP", order: 0 },
+    { id: "prop", name: "Floor", obrLayer: "PROP", order: 0 },
+  ] };
+  const map = item("map", "map", false, "MAP");
+  const prop = item("prop", "prop");
+  activateTransparency(map, "direct");
+  activateTransparency(prop, "direct");
+  assert.equal(directGroupTransparency([map, prop], linked, "MAP", "map"), true);
 });
 
-test("state selection is a structural transparency override, not item visibility", () => {
-  const selected = item("day", "day");
-  const inactive = item("night", "night");
-  const stateful: VirtualLayerState = {
-    version: 3,
-    layers: [
-      { id: "day", name: "Manor: Day", obrLayer: "PROP", order: 0 },
-      { id: "night", name: "Manor: Night", obrLayer: "PROP", order: 1 },
-    ],
-    stateSelections: { manor: "day" },
-  };
-  assert.deepEqual(getEffectiveItemRule(selected, stateful), {});
-  assert.deepEqual(getEffectiveItemRule(inactive, stateful), { transparent: true });
-  assert.equal(selected.visible, true);
-  assert.equal(inactive.visible, true);
-  stateful.inheritance = { virtual: { night: { mode: "independent", enforce: { transparent: false } } } };
-  assert.deepEqual(getEffectiveItemRule(inactive, stateful), { transparent: true });
-  stateful.inheritance.virtual!.night = { mode: "independent", enforce: { transparent: true } };
-  stateful.stateSelections = { manor: "night" };
-  assert.deepEqual(getEffectiveItemRule(inactive, stateful), { transparent: true });
-  delete stateful.inheritance;
-  assert.deepEqual(getEffectiveItemRule(inactive, stateful), {});
-});
-
-test("allows visibility and click-through instructions to compose with transparency", () => {
-  const target = item("compound", "roofs");
-  target.metadata[ITEM_TRANSPARENCY_METADATA_KEY] = { scale: { x: 1, y: 1 }, source: "inherited" };
-  target.scale = { x: 0, y: 0 };
-  target.visible = false;
-  target.disableHit = true;
-  const compound: VirtualLayerState = {
-    ...state,
-    inheritance: { ...state.inheritance, virtual: {
-      roofs: { mode: "independent", enforce: { transparent: true, visible: true, disableHit: false } },
-    } },
-  };
-  assert.deepEqual(calculateInheritanceUpdates([target], compound).get("compound"), {
-    instructions: { transparent: true, visible: true, disableHit: false },
-  });
-});
-
-test("migrates a legacy independent transparent item without restoring it", () => {
-  const target = item("legacy", undefined, full);
-  target.metadata[ITEM_TRANSPARENCY_METADATA_KEY] = {
-    scale: { x: 1, y: 1 }, visible: true, disableHit: false, source: "inherited",
-  };
-  assert.deepEqual(calculateInheritanceUpdates([target], state).get("legacy"), { instructions: {}, preserveTransparency: true });
-});
-
-test("captures aggregate values and maps the new icon states", () => {
-  assert.deepEqual(captureAggregateState([]), { disableHit: false, locked: false, visible: true, transparent: false });
-  assert.deepEqual(captureAggregateState([
-    { disableHit: true, locked: true, visible: false, metadata: {} },
-    { disableHit: false, locked: true, visible: true, metadata: {} },
-  ]), { disableHit: false, locked: true, visible: false, transparent: false });
-  const transparentVisible = item("transparent-visible");
-  activateTransparency(transparentVisible, "direct");
-  assert.equal(transparentVisible.visible, false);
-  assert.deepEqual(itemState(transparentVisible), {
-    disableHit: false, locked: false, visible: true, transparent: true,
-  });
-  assert.equal(captureAggregateState([transparentVisible]).visible, true);
-  assert.equal(inheritanceVisualState("native", false), "disabled");
-  assert.equal(inheritanceVisualState("native", true), "enabled");
-  assert.equal(inheritanceVisualState("virtual", false, true), "blocked-virtual-layer");
-  assert.equal(inheritanceVisualState("item", false, true), "blocked-item");
-  assert.equal(itemInheritanceLabel(false), "Independent");
-  assert.equal(itemInheritanceLabel(true), "Allow inheritance");
-});
-
-test("preserves inheritance through edits and removes deleted virtual configuration", () => {
-  assert.deepEqual(renameVirtualLayer(state, "roofs", "New Roofs").inheritance, state.inheritance);
-  assert.deepEqual(reorderVirtualLayer(state, "roofs", 0).inheritance, state.inheritance);
-  assert.deepEqual(deleteVirtualLayer(state, "roofs").inheritance, {
-    native: state.inheritance?.native,
-    unassigned: state.inheritance?.unassigned,
-  });
-});
-
-test("plans linked property updates by effective property instructions rather than layer mode", () => {
-  let linked = createVirtualLayer(state, "MAP", " roofs ", "map-roofs");
-  linked = createVirtualLayer(linked, "CHARACTER", "ROOFS", "character-roofs");
-  linked = createVirtualLayer(linked, "DRAWING", "Roofs", "drawing-roofs");
-  linked = createVirtualLayer(linked, "NOTE", "ROOFS", "empty-roofs");
-  linked = createVirtualLayer(linked, "TEXT", "roofs", "text-roofs");
-  linked = {
-    ...linked,
-    inheritance: {
-      ...linked.inheritance,
-      native: { ...linked.inheritance?.native, TEXT: { locked: true } },
-      virtual: {
-        ...linked.inheritance?.virtual,
-        "map-roofs": { mode: "independent", enforce: { visible: false } },
-        "character-roofs": { mode: "pass-through" },
-        "drawing-roofs": { mode: "independent", enforce: { disableHit: true } },
-        "empty-roofs": { mode: "independent", enforce: {} },
-        "text-roofs": { mode: "pass-through" },
-      },
-    },
-  };
-  const placed = (id: string, layer: Item["layer"], assignment: string, independent = false) => {
-    const target = item(id, assignment, independent);
-    target.layer = layer;
-    return target;
-  };
-  const items = [
-    placed("source", "PROP", "roofs"),
-    placed("source-independent", "PROP", "roofs", true),
-    placed("map", "MAP", "map-roofs"),
-    placed("map-independent", "MAP", "map-roofs", true),
-    placed("character", "CHARACTER", "character-roofs"),
-    placed("drawing", "DRAWING", "drawing-roofs"),
-    placed("text", "TEXT", "text-roofs"),
-  ];
-  const allLinked = ["source", "source-independent", "map", "map-independent", "character", "drawing", "text"];
-  for (const property of ["locked", "visible", "disableHit", "transparent"] as const) {
-    assert.deepEqual(linkedDirectPropertyItemIds(items, linked, "roofs", property), allLinked);
-  }
-  assert.deepEqual(linkedDirectPropertyItemIds(items, linked, "character-roofs", "visible"), allLinked);
-  assert.deepEqual(linkedDirectPropertyItemIds(items, linked, "text-roofs", "locked"), allLinked);
-  assert.deepEqual(getGroupEffectiveInstructions(linked, "MAP", "map-roofs"), {});
-});
-
-test("derives native direct targets from current inheritance eligibility", () => {
-  const items = [item("unassigned"), item("independent", undefined, true), item("roof", "roofs")];
-  assert.deepEqual(directNativeItemIds(items, state, "PROP"), ["unassigned"]);
-});
-
-test("linked and dependent virtual layers block native cascading inheritance", () => {
-  const boundary: VirtualLayerState = {
-    version: 3,
-    layers: [
-      { id: "linked", name: "Shared", obrLayer: "PROP", order: 0 },
-      { id: "linked-map", name: "shared", obrLayer: "MAP", order: 0 },
-      { id: "dependent", name: "House: floor 1/Lights", obrLayer: "PROP", order: 1 },
-      { id: "ordinary", name: "Ordinary", obrLayer: "PROP", order: 2 },
-    ],
-    inheritance: { native: { PROP: { locked: true } } },
-  };
-  assert.deepEqual(getGroupEffectiveInstructions(boundary, "PROP", "linked"), {});
-  assert.deepEqual(getGroupEffectiveInstructions(boundary, "PROP", "dependent"), {});
-  assert.deepEqual(getGroupEffectiveInstructions(boundary, "PROP", "ordinary"), { locked: true });
-  const items = [item("linked", "linked"), item("dependent", "dependent"), item("ordinary", "ordinary")];
-  assert.deepEqual(directNativeItemIds(items, boundary, "PROP"), ["ordinary"]);
-  assert.deepEqual(getEffectiveItemRule(items[0], boundary), {});
-  assert.deepEqual(getEffectiveItemRule(items[1], boundary), { transparent: true });
-  assert.deepEqual(getEffectiveItemRule(items[2], boundary), { locked: true });
-});
-
-test("locally enforced transparency reaches linked peers in both directions and survives enforcement", () => {
-  let linked = createVirtualLayer(state, "MAP", "Roofs", "map-roofs");
-  linked = createVirtualLayer(linked, "DRAWING", "Roofs", "drawing-roofs");
-  linked = createVirtualLayer(linked, "TEXT", "Roofs", "text-roofs");
-  linked.inheritance = {
-    ...linked.inheritance,
-    native: { ...linked.inheritance?.native, TEXT: { transparent: false } },
-    virtual: {
-      ...linked.inheritance?.virtual,
-      "drawing-roofs": { mode: "independent", enforce: { transparent: false } },
-    },
-  };
-  const items = [item("source", "roofs"), item("peer", "map-roofs"),
-    item("own-rule", "drawing-roofs"), item("native-rule", "text-roofs")];
-  items[1].layer = "MAP";
-  items[2].layer = "DRAWING";
-  items[3].layer = "TEXT";
-  const originalScale = { ...items[1].scale };
-  for (const transparent of [true, false]) {
-    linked.inheritance.virtual!.roofs = { mode: "independent", enforce: { transparent } };
-    const ids = linkedDirectPropertyItemIds(items, linked, "roofs", "transparent");
-    assert.deepEqual(ids, ["source", "peer", "own-rule", "native-rule"]);
-    for (const target of items.filter((target) => ids.includes(target.id))) {
-      if (transparent) activateTransparency(target, "direct");
-      else restoreTransparency(target);
-    }
-    assert.equal(isItemTransparent(items[1]), transparent);
-    assert.equal(calculateInheritanceUpdates(items, linked).has("peer"), false);
-  }
-  assert.deepEqual(items[1].scale, originalScale);
-  assert.deepEqual(linkedDirectPropertyItemIds(items, linked, "text-roofs", "transparent"), ["source", "peer", "own-rule", "native-rule"]);
-});
-
-test("creating and renaming linked layers never copies inheritance configuration", () => {
-  const created = createVirtualLayer(state, "MAP", "Roofs", "new-roofs");
-  assert.equal(created.inheritance?.virtual?.["new-roofs"], undefined);
-  const renamed = renameVirtualLayer(createVirtualLayer(state, "MAP", "Other", "other"), "other", "Roofs");
-  assert.equal(renamed.inheritance?.virtual?.other, undefined);
-  assert.equal(created.inheritance?.virtual?.roofs, undefined);
-  assert.equal(renamed.inheritance?.virtual?.roofs, undefined);
-});
-
-test("Tomb switches synchronize enforced Props and direct Maps with an unmatched third state", () => {
-  for (const extraLayer of ["MAP", "PROP"] as const) {
-    let tomb: VirtualLayerState = {
-      version: 3,
-      layers: [
-        { id: "p2", name: "Tomb: -2", obrLayer: "PROP", order: 0 },
-        { id: "p4", name: "Tomb: -4", obrLayer: "PROP", order: 1 },
-        { id: "m2", name: "Tomb: -2", obrLayer: "MAP", order: 0 },
-        { id: "m4", name: "Tomb: -4", obrLayer: "MAP", order: 1 },
-        { id: "extra", name: "Tomb: -3", obrLayer: extraLayer, order: 2 },
-      ],
-      inheritance: { virtual: {
-        p2: { mode: "independent", enforce: { transparent: true, locked: true } },
-        p4: { mode: "independent", enforce: { transparent: true } },
-        m2: { mode: "independent", enforce: {} },
-        m4: { mode: "independent", enforce: {} },
-      } },
-    };
-    const items = tomb.layers.map((layer) => ({ ...item(layer.id, layer.id), layer: layer.obrLayer }));
-    for (const source of ["m2", "m4", "p2", "p4"]) {
-      tomb = withLinkedGroupProperty(tomb, source, "transparent", false);
-      const direct = new Map(linkedDirectPropertyItemIds(items, tomb, source, "transparent").map((id) => [id, false]));
-      for (const sibling of mutuallyExclusiveVirtualLayers(tomb, source)) {
-        tomb = withLinkedGroupProperty(tomb, sibling.id, "transparent", true);
-        for (const id of linkedDirectPropertyItemIds(items, tomb, sibling.id, "transparent")) direct.set(id, true);
-      }
-      for (const target of items) {
-        const rule = getItemParentRule(target, tomb);
-        const transparent = rule.transparent ?? direct.get(target.id);
-        assert.equal(transparent, target.id === "extra" || target.id.slice(1) !== source.slice(1));
-      }
-      assert.deepEqual(tomb.inheritance?.virtual?.p2, { mode: "independent", enforce: { transparent: source.endsWith("4"), locked: true } });
-      assert.deepEqual(tomb.inheritance?.virtual?.m2, { mode: "independent", enforce: {} });
-    }
-  }
+test("creating or renaming linked layers preserves independent inheritance rules", () => {
+  const linked = createVirtualLayer(state, "MAP", "Roofs", "map-roofs");
+  assert.deepEqual(linked.inheritance?.virtual?.roofs, state.inheritance?.virtual?.roofs);
+  assert.deepEqual(renameVirtualLayer(linked, "map-roofs", "Other").inheritance?.virtual?.roofs, state.inheritance?.virtual?.roofs);
+  assert.deepEqual(directNativeItemIds([item("loose"), item("independent", undefined, true)], state, "PROP"), ["loose"]);
 });

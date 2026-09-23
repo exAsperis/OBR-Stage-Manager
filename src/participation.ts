@@ -18,7 +18,7 @@ export interface ResolvedStateGroup {
   states: Array<{ id: string; name: string; layers: VirtualLayerDefinition[] }>;
 }
 
-export type SuppressionReason = "unselected" | "guardian-suppressed" | "guardian-missing";
+export type SuppressionReason = "unselected" | "manual" | "guardian-suppressed" | "guardian-missing";
 
 export interface VirtualLayerParticipation {
   participating: boolean;
@@ -96,12 +96,14 @@ export function resolveParticipationModel(state: VirtualLayerState): ResolvedPar
     const guardian = logical.guardianId ? logicalById.get(logical.guardianId) : undefined;
     const guardianParticipation = guardian ? resolve(guardian) : undefined;
     const guardianParticipating = logical.guardianId ? guardianParticipation?.participating === true : true;
+    const manuallyParticipating = state.participationOverrides?.[logical.id] !== false;
     const reasons: SuppressionReason[] = [];
     if (selected === false) reasons.push("unselected");
+    if (!manuallyParticipating) reasons.push("manual");
     if (logical.guardianId && !guardian) reasons.push("guardian-missing");
     else if (logical.guardianId && !guardianParticipating) reasons.push("guardian-suppressed");
     const participation = {
-      participating: selected !== false && guardianParticipating,
+      participating: selected !== false && manuallyParticipating && guardianParticipating,
       ...(selected !== undefined ? { locallySelected: selected } : {}),
       guardianParticipating,
       reasons,
@@ -122,6 +124,21 @@ export function resolveParticipationModel(state: VirtualLayerState): ResolvedPar
     .sort((a, b) => (groupPositions.get(a.entry.id) ?? groupOrder.length + a.index) - (groupPositions.get(b.entry.id) ?? groupOrder.length + b.index))
     .map(({ entry }) => entry);
   return { logicalLayers: [...logicalById.values()], stateGroups, byDefinitionId, byLogicalId };
+}
+
+export function withLogicalParticipation(state: VirtualLayerState, definitionId: string, participating: boolean): VirtualLayerState {
+  const model = resolveParticipationModel(state);
+  const logical = model.logicalLayers.find((entry) => entry.definitions.some((definition) => definition.id === definitionId));
+  if (!logical) return state;
+  if (logical.stateGroupId && logical.stateName) {
+    if (participating) return withStateGroupSelection(state, logical.stateGroupId, logical.stateName);
+    const selected = state.stateSelections?.[logical.stateGroupId];
+    return selected === logical.stateName.toLocaleLowerCase() ? withStateGroupSelection(state, logical.stateGroupId, null) : state;
+  }
+  const participationOverrides = { ...state.participationOverrides };
+  if (participating) delete participationOverrides[logical.id];
+  else participationOverrides[logical.id] = false;
+  return { ...state, participationOverrides: Object.keys(participationOverrides).length ? participationOverrides : undefined };
 }
 
 export function withStateGroupSelection(state: VirtualLayerState, groupId: string, stateName: string | null): VirtualLayerState {
@@ -157,5 +174,6 @@ export function participationDescription(participation: VirtualLayerParticipatio
   if (participation.participating) return "Participating";
   if (participation.reasons.includes("guardian-missing")) return "Suppressed — guardian layer is missing";
   if (participation.reasons.includes("guardian-suppressed")) return "Suppressed — guardian is not participating";
+  if (participation.reasons.includes("manual")) return "Suppressed — manually offstage";
   return "Suppressed — state is unselected";
 }

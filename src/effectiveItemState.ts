@@ -1,17 +1,17 @@
 import type { Item } from "@owlbear-rodeo/sdk";
-import type { EnforcedItemState, StatefulProperty } from "./virtualLayers.ts";
+import type { EffectiveItemState, StatefulProperty } from "./virtualLayers.ts";
 import { STATEFUL_PROPERTIES } from "./virtualLayers.ts";
 import { activateTransparency, getTransparentState, restoreTransparency, setTransparentItemVisible, type TransparencyRestoreResult } from "./transparentState.ts";
 import { captureLocalItemProperty, releaseLocalItemProperty } from "./localItemState.ts";
 
-const has = (state: EnforcedItemState, property: StatefulProperty) =>
+const has = (state: Partial<EffectiveItemState>, property: StatefulProperty) =>
   Object.prototype.hasOwnProperty.call(state, property);
 
 /**
  * Applies structural overrides and releases properties that are no longer
  * overridden. Only overridden properties receive a temporary local shadow.
  */
-export function applyEffectiveItemState(item: Item, overrides: EnforcedItemState): TransparencyRestoreResult {
+export function applyEffectiveItemState(item: Item, overrides: Partial<EffectiveItemState>): TransparencyRestoreResult {
   const targets: Partial<Record<StatefulProperty, boolean>> = {};
   for (const property of STATEFUL_PROPERTIES) {
     if (has(overrides, property)) {

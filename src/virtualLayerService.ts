@@ -22,28 +22,26 @@ import {
   stackGroup,
   stateFromMetadata,
   type EnforcedItemState,
-  type StatefulProperty,
+  type InheritableProperty,
   type VirtualInheritance,
   type VirtualLayerState,
 } from "./virtualLayers";
 import {
   calculateInheritanceUpdates,
-  directGroupItemIds,
   directGroupTransparency,
+  definitionItemIds,
   directNativeItemIds,
   getEffectiveItemRule,
   getGroupEffectiveInstructions,
   getGroupInheritance,
   getItemRule,
   getNativeRule,
-  linkedDirectPropertyItemIds,
-  withLinkedGroupProperty,
+  logicalLayerItemIds,
 } from "./stateInheritance";
 import { activateTransparency, getTransparentState, needsTransparencyEnforcement, restoreTransparency, setTransparentItemVisible } from "./transparentState";
 import { storeLocalItemProperty, updateShadowedLocalItemProperty } from "./localItemState";
 import { applyEffectiveItemState } from "./effectiveItemState";
-import { getInheritanceBoundary } from "./inheritanceBoundary";
-import { reorderResolvedStateGroup, reorderResolvedStateGroups, resolveParticipationModel, withStateGroupSelection } from "./participation";
+import { reorderResolvedStateGroup, reorderResolvedStateGroups, resolveParticipationModel, withLogicalParticipation, withStateGroupSelection } from "./participation";
 import { runOutlinerV1NamespaceConversion } from "./namespaceMigration";
 import type { ElevatorConfiguration } from "./elevator";
 
@@ -206,14 +204,13 @@ function withGroupInheritance(state: VirtualLayerState, scope: Extract<RuleScope
 export function setGroupInheritanceMode(scope: Extract<RuleScope, { kind: "group" }>, mode: VirtualInheritance["mode"]) {
   return serialized(async () => {
     const state = await getState();
-    if (getInheritanceBoundary(state, scope.groupId)) return;
     const next = withGroupInheritance(state, scope, mode === "pass-through" ? { mode } : { mode, enforce: {} });
     await setState(next);
     await enforceStateInheritance(next);
   });
 }
 
-export function setScopeEnforcement(scope: RuleScope, property: StatefulProperty, enabled: boolean, capturedValue: boolean) {
+export function setScopeEnforcement(scope: RuleScope, property: InheritableProperty, enabled: boolean, capturedValue: boolean) {
   return serialized(async () => {
     const state = await getState();
     let next: VirtualLayerState;
@@ -222,7 +219,6 @@ export function setScopeEnforcement(scope: RuleScope, property: StatefulProperty
       if (enabled) enforce[property] = capturedValue; else delete enforce[property];
       next = withNativeInstructions(state, scope.layer, enforce);
     } else {
-      if (getInheritanceBoundary(state, scope.groupId)) return;
       const config = getGroupInheritance(state, scope.layer, scope.groupId);
       if (config.mode !== "independent") return;
       const enforce = { ...config.enforce };
@@ -234,7 +230,7 @@ export function setScopeEnforcement(scope: RuleScope, property: StatefulProperty
   });
 }
 
-export function setScopeProperty(scope: RuleScope, property: StatefulProperty, value: boolean) {
+export function setScopeProperty(scope: RuleScope, property: InheritableProperty, value: boolean) {
   return serialized(async () => {
     const state = await getState();
     const items = await OBR.scene.items.getItems();
@@ -251,12 +247,10 @@ export function setScopeProperty(scope: RuleScope, property: StatefulProperty, v
       } else if (Object.prototype.hasOwnProperty.call(getGroupEffectiveInstructions(state, scope.layer, scope.groupId), property)) {
         return;
       }
-      if (scope.groupId !== "__unassigned__") {
-        next = withLinkedGroupProperty(next, scope.groupId, property, value);
-        linkedDirectPropertyItemIds(items, state, scope.groupId, property).forEach((id) => directValues.set(id, value));
-      } else if (!Object.prototype.hasOwnProperty.call(getGroupEffectiveInstructions(state, scope.layer, scope.groupId), property)) {
-        directGroupItemIds(items, state, scope.layer, scope.groupId).forEach((id) => directValues.set(id, value));
-      }
+      const instructed = Object.prototype.hasOwnProperty.call(getGroupEffectiveInstructions(state, scope.layer, scope.groupId), property);
+      const exactIds = new Set(definitionItemIds(items, state, scope.layer, scope.groupId));
+      items.filter((item) => exactIds.has(item.id) && (Boolean(getItemRule(item)) || !instructed))
+        .forEach((item) => directValues.set(item.id, value));
     }
     if (next !== state) await setState(next);
     const restores = new Map<string, boolean>();
@@ -264,13 +258,7 @@ export function setScopeProperty(scope: RuleScope, property: StatefulProperty, v
       for (const item of draft) {
         const directValue = directValues.get(item.id) ?? value;
         if (updateShadowedLocalItemProperty(item, property, directValue)) continue;
-        if (property === "transparent") {
-          if (directValue) activateTransparency(item, "direct");
-          else {
-            const result = restoreTransparency(item, getEffectiveItemRule(item, next).visible);
-            if (result.restored) restores.set(item.id, result.reactivate);
-          }
-        } else if (property === "visible" && setTransparentItemVisible(item, directValue)) {
+        if (property === "visible" && setTransparentItemVisible(item, directValue)) {
           // Transparent parents stay hidden while their logical visibility changes.
         } else item[property] = directValue;
       }
@@ -368,6 +356,43 @@ export function assignItems(itemIds: string[], virtualLayerId?: string, nativeLa
       refreshed = await OBR.scene.items.getItems();
     }
     await normalizeLayers(affectedLayers, state);
+    await enforceStateInheritance(state);
+  });
+}
+
+export function setScopeParticipation(scope: RuleScope, offstage: boolean) {
+  return serialized(async () => {
+    const state = await getState();
+    if (scope.kind === "group" && scope.groupId !== "__unassigned__") {
+      const next = withLogicalParticipation(state, scope.groupId, !offstage);
+      if (!offstage) {
+        const items = await OBR.scene.items.getItems();
+        const ids = logicalLayerItemIds(items, state, scope.groupId)
+          .filter((id) => Boolean(getTransparentState(items.find((item) => item.id === id)!)));
+        if (ids.length) await OBR.scene.items.updateItems(ids, (draft) => {
+          for (const item of draft) storeLocalItemProperty(item, "transparent", false);
+        }, true);
+      }
+      if (next !== state) await setState(next);
+      await enforceStateInheritance(next);
+      return;
+    }
+    const items = await OBR.scene.items.getItems();
+    const ids = scope.kind === "native"
+      ? items.filter((item) => item.layer === scope.layer).map((item) => item.id)
+      : items.filter((item) => item.layer === scope.layer && !getAssignmentId(item)).map((item) => item.id);
+    const restores = new Map<string, boolean>();
+    if (ids.length) await OBR.scene.items.updateItems(ids, (draft) => {
+      for (const item of draft) {
+        if (updateShadowedLocalItemProperty(item, "transparent", offstage)) continue;
+        if (offstage) activateTransparency(item, "direct");
+        else {
+          const result = restoreTransparency(item, getEffectiveItemRule(item, state).visible);
+          if (result.restored) restores.set(item.id, result.reactivate);
+        }
+      }
+    }, true);
+    await finishRestoredItems(restores);
     await enforceStateInheritance(state);
   });
 }

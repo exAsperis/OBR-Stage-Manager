@@ -1,5 +1,5 @@
 import type { Item } from "@owlbear-rodeo/sdk";
-import type { InheritedItemState, StatefulProperty } from "./virtualLayers.ts";
+import type { EffectiveItemState, StatefulProperty } from "./virtualLayers.ts";
 import { getItemVisible, getTransparentState } from "./transparentState.ts";
 
 // Kept literal so this pure module can run in Node's stripped-TypeScript test mode.
@@ -7,7 +7,7 @@ const ITEM_LOCAL_STATE_METADATA_KEY = "com.ex-asperis.obr-stage-manager/v1/local
 
 export interface StoredLocalItemState {
   version: 1;
-  values: Partial<InheritedItemState>;
+  values: Partial<EffectiveItemState>;
 }
 
 type LocalStateItem = Pick<Item, "disableHit" | "locked" | "visible" | "metadata">;
@@ -16,9 +16,9 @@ export function parseLocalItemState(value: unknown): StoredLocalItemState | unde
   if (!value || typeof value !== "object" || (value as { version?: unknown }).version !== 1) return undefined;
   const raw = (value as { values?: unknown }).values;
   if (!raw || typeof raw !== "object") return undefined;
-  const values: Partial<InheritedItemState> = {};
+  const values: Partial<EffectiveItemState> = {};
   for (const property of ["transparent", "disableHit", "locked", "visible"] as StatefulProperty[]) {
-    const candidate = (raw as Partial<InheritedItemState>)[property];
+    const candidate = (raw as Partial<EffectiveItemState>)[property];
     if (typeof candidate === "boolean") values[property] = candidate;
   }
   return Object.keys(values).length ? { version: 1, values } : undefined;

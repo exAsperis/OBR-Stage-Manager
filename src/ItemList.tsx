@@ -33,13 +33,12 @@ import { parseVirtualLayerPath } from "./virtualLayerName";
 import type { DropPosition } from "./dragPosition";
 import { SendMenuButton } from "./SendMenuButton";
 import { getLayerPropertyState } from "./layerPropertyState";
-import { captureAggregateState, getGroupInheritance, getItemRule, getNativeRule, hasInstructions, inheritanceVisualState, itemState, type StatefulProperty } from "./stateInheritance";
-import { setScopeProperty, type RuleScope } from "./virtualLayerService";
+import { captureAggregateState, getGroupInheritance, getItemRule, getNativeRule, hasInstructions, inheritanceVisualState, itemState, type InheritableProperty } from "./stateInheritance";
+import { setScopeParticipation, setScopeProperty, type RuleScope } from "./virtualLayerService";
 import { OverflowTooltipText } from "./OverflowTooltipText";
 import { InheritanceStateIcon } from "./InheritanceStateIcon";
 import { OffStageIcon, OnStageIcon } from "./icons/other/TransparencyIcons";
 import { InheritanceMenu } from "./InheritanceMenu";
-import { getInheritanceBoundary, inheritanceBoundaryDescription } from "./inheritanceBoundary";
 import { useLayerDisplaySettings } from "./layerSettings";
 import { participationDescription, resolveParticipationModel } from "./participation";
 import { HierarchyActionRow, type HierarchyAction, type HierarchyActionContext } from "./HierarchyActions";
@@ -208,40 +207,39 @@ function LayerPropertyControls({ items, scope, fog = false, leadingActions = [],
   useEffect(() => () => onMenuOpenChange?.(false), [onMenuOpenChange]);
   const parentRule = scope.kind === "group" ? getNativeRule(state, scope.layer) : {};
   const config = scope.kind === "group" ? getGroupInheritance(state, scope.layer, scope.groupId) : undefined;
-  const boundary = scope.kind === "group" ? getInheritanceBoundary(state, scope.groupId) : undefined;
   const localRule = scope.kind === "native" ? getNativeRule(state, scope.layer) : config?.mode === "independent" ? config.enforce : {};
   const effectiveRule = scope.kind === "group" && config?.mode === "pass-through" ? parentRule : localRule;
   const eligible = items.filter((item) => {
     if (getItemRule(item)) return false;
-    return scope.kind === "group" || (!getInheritanceBoundary(state, resolveGroupId(item, state)) && getGroupInheritance(state, item.layer, resolveGroupId(item, state)).mode === "pass-through");
+    return scope.kind === "group" || getGroupInheritance(state, item.layer, resolveGroupId(item, state)).mode === "pass-through";
   });
   const localStates = eligible.map(itemState);
   const aggregate = getLayerPropertyState(localStates);
   const { mixedDisableHit, mixedLocked, mixedVisible } = aggregate;
-  const allTransparent = localStates.length > 0 && localStates.every((item) => item.transparent);
-  const mixedTransparent = localStates.some((item) => item.transparent) && !allTransparent;
+  const participationStates = items.map(itemState);
+  const allTransparent = participationStates.length > 0 && participationStates.every((item) => item.transparent);
+  const mixedTransparent = participationStates.some((item) => item.transparent) && !allTransparent;
   const aggregateState = captureAggregateState(eligible);
-  const displayed = { ...aggregateState, ...effectiveRule };
+  const displayed = { ...aggregateState, ...effectiveRule, transparent: allTransparent };
   const visibilityAction = fog
     ? displayed.visible ? "Cut all" : "Uncut all"
     : displayed.visible ? "Hide all" : "Show all";
   const independent = config?.mode === "independent";
-  const inheritanceState = boundary ? "blocked-virtual-layer" : inheritanceVisualState(scope.kind === "native" ? "native" : "virtual", hasInstructions(effectiveRule), independent);
+  const inheritanceState = inheritanceVisualState(scope.kind === "native" ? "native" : "virtual", hasInstructions(effectiveRule), independent);
   const inheritanceColor = inheritanceState === "enabled" ? "warning" : inheritanceState === "disabled" ? "default" : "error";
-  const isReceived = (property: StatefulProperty) => scope.kind === "group" && config?.mode === "pass-through" && Object.prototype.hasOwnProperty.call(parentRule, property);
-  const isEnforced = (property: StatefulProperty) => Object.prototype.hasOwnProperty.call(effectiveRule, property);
-  const stateColor = (property: StatefulProperty, mixed: boolean) => isEnforced(property) ? "warning" : mixed ? "info" : "default";
-  const transparencyColor = stateColor("transparent", mixedTransparent);
-  const disabled = (property: StatefulProperty) => isReceived(property) || (!isEnforced(property) && eligible.length === 0);
-  const disabledSx = (property: StatefulProperty) => isReceived(property) ? { "&.Mui-disabled": { color: "warning.main" } } : undefined;
-  const setProperty = (property: StatefulProperty, value: boolean) => setScopeProperty(scope, property, value);
+  const isReceived = (property: InheritableProperty) => scope.kind === "group" && config?.mode === "pass-through" && Object.prototype.hasOwnProperty.call(parentRule, property);
+  const isEnforced = (property: InheritableProperty) => Object.prototype.hasOwnProperty.call(effectiveRule, property);
+  const stateColor = (property: InheritableProperty, mixed: boolean) => isEnforced(property) ? "warning" : mixed ? "info" : "default";
+  const disabled = (property: InheritableProperty) => isReceived(property) || (!isEnforced(property) && eligible.length === 0);
+  const disabledSx = (property: InheritableProperty) => isReceived(property) ? { "&.Mui-disabled": { color: "warning.main" } } : undefined;
+  const setProperty = (property: InheritableProperty, value: boolean) => setScopeProperty(scope, property, value);
   const actions: HierarchyAction[] = [
     ...leadingActions,
-    ...(features.manageInheritance ? [{ id: "inheritance", label: boundary ? inheritanceBoundaryDescription(boundary) : "Configure inheritance", icon: <InheritanceStateIcon state={inheritanceState} fontSize="small" />, color: inheritanceColor, onSelect: (anchor: HTMLElement) => setInheritanceAnchor(anchor) } as HierarchyAction] : []),
-    ...(features.transparency ? [{ id: "stage", label: displayed.transparent ? "Bring on-stage" : "Send off-stage", icon: displayed.transparent ? <OffStageIcon fontSize="small" /> : <OnStageIcon fontSize="small" />, color: transparencyColor, disabled: disabled("transparent"), disabledSx: disabledSx("transparent"), onSelect: () => { void setProperty("transparent", !displayed.transparent); } } as HierarchyAction] : []),
+    ...(features.manageInheritance ? [{ id: "inheritance", label: "Configure inheritance", icon: <InheritanceStateIcon state={inheritanceState} fontSize="small" />, color: inheritanceColor, onSelect: (anchor: HTMLElement) => setInheritanceAnchor(anchor) } as HierarchyAction] : []),
+    ...(features.transparency ? [{ id: "stage", label: displayed.transparent ? "Bring on-stage" : "Send off-stage", icon: displayed.transparent ? <OffStageIcon fontSize="small" /> : <OnStageIcon fontSize="small" />, color: mixedTransparent ? "info" : "default", disabled: items.length === 0, onSelect: () => { void setScopeParticipation(scope, !displayed.transparent); } } as HierarchyAction] : []),
     ...(features.interaction ? [{ id: "clicks", label: displayed.disableHit ? "Enable clicks for all" : "Disable clicks for all", icon: displayed.disableHit ? <ClickThroughIcon fontSize="small" /> : <ClickableIcon fontSize="small" />, color: stateColor("disableHit", mixedDisableHit), disabled: disabled("disableHit"), disabledSx: disabledSx("disableHit"), onSelect: () => { void setProperty("disableHit", !displayed.disableHit); } } as HierarchyAction] : []),
     ...(features.locked ? [{ id: "lock", label: displayed.locked ? "Unlock all" : "Lock all", icon: displayed.locked ? <LockedIcon fontSize="small" /> : <UnlockIcon fontSize="small" />, color: stateColor("locked", mixedLocked), disabled: disabled("locked"), disabledSx: disabledSx("locked"), onSelect: () => { void setProperty("locked", !displayed.locked); } } as HierarchyAction] : []),
     ...(features.visible ? [{ id: "visibility", label: visibilityAction, icon: fog ? displayed.visible ? <FogCutOffIcon fontSize="small" /> : <FogCutOnIcon fontSize="small" /> : displayed.visible ? <VisibleIcon fontSize="small" /> : <HiddenIcon fontSize="small" />, color: stateColor("visible", mixedVisible), disabled: disabled("visible"), disabledSx: disabledSx("visible"), onSelect: () => { void setProperty("visible", !displayed.visible); } } as HierarchyAction] : []),
   ];
-  return <><HierarchyActionRow actions={actions} context={context} onOverflowOpenChange={setOverflowOpen} />{features.manageInheritance && <InheritanceMenu anchorEl={inheritanceAnchor} scope={scope} config={config} enforce={localRule} displayed={displayed} features={features} boundary={boundary} onClose={() => setInheritanceAnchor(null)} />}</>;
+  return <><HierarchyActionRow actions={actions} context={context} onOverflowOpenChange={setOverflowOpen} />{features.manageInheritance && <InheritanceMenu anchorEl={inheritanceAnchor} scope={scope} config={config} enforce={localRule} displayed={displayed} features={features} onClose={() => setInheritanceAnchor(null)} />}</>;
 }
