@@ -73,8 +73,20 @@ export function ElevatorMenuApp() {
 
   return <div id="menu-viewport"><div id="send-menu" role="menu" aria-label="Elevator destination">
     {item && <Typography variant="caption" sx={{ display: "block", px: 1.5, py: .5 }}>
-      {configuration ? `Elevator: ${valid ? (isElevatorDisabled(item) ? "disabled" : "enabled") : "destination missing"}` : "Configure as Elevator"}
+      {configuration ? `Elevator: ${valid ? (isElevatorDisabled(item) ? "disabled" : "enabled") : "destination missing"}` : "Select a destination for the Elevator."}
     </Typography>}
+    {configuration && <>
+      <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void toggleDisabled()}>
+        <ListItemIcon sx={{ minWidth: 32 }}>{isElevatorDisabled(item!)
+          ? <ElevatorIcon fontSize="small" />
+          : <img src={`/elevator-disabled.svg?v=${import.meta.env.VITE_RELEASE_VERSION}`} width="20" height="20" alt="" />}
+        </ListItemIcon><ListItemText primary={`${isElevatorDisabled(item!) ? "Enable" : "Disable"} Elevator`} />
+      </ListItemButton>
+      <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void save()}>
+        <ListItemIcon sx={{ minWidth: 32 }}><DeleteOutlineIcon fontSize="small" /></ListItemIcon><ListItemText primary="Remove Elevator" />
+      </ListItemButton>
+      <Divider />
+    </>}
     {layers.map((layer) => {
       const nativeDestination = { kind: "native", layer } as const;
       const nativeConfigured = isConfigured(nativeDestination);
@@ -93,18 +105,6 @@ export function ElevatorMenuApp() {
         </ListItemButton>;
       })}
     </div>})}
-    {configuration && <>
-      <Divider />
-      <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void toggleDisabled()}>
-        <ListItemIcon sx={{ minWidth: 32 }}>{isElevatorDisabled(item!)
-          ? <ElevatorIcon fontSize="small" />
-          : <img src={`/elevator-disabled.svg?v=${import.meta.env.VITE_RELEASE_VERSION}`} width="20" height="20" alt="" />}
-        </ListItemIcon><ListItemText primary={`${isElevatorDisabled(item!) ? "Enable" : "Disable"} Elevator`} />
-      </ListItemButton>
-      <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void save()}>
-        <ListItemIcon sx={{ minWidth: 32 }}><DeleteOutlineIcon fontSize="small" /></ListItemIcon><ListItemText primary="Remove Elevator" />
-      </ListItemButton>
-    </>}
     {error && <Typography id="status" role="status" color="error" variant="caption">{error}</Typography>}
   </div></div>;
 }
