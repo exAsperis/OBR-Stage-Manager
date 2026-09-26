@@ -24,7 +24,7 @@ has this shape:
 ```json
 {
   "name": "Stage Manager (Local)",
-  "version": "1.8.2-local",
+  "version": "1.9.0-local",
   "manifest_version": 1,
   "author": "ex Asperis",
   "icon": "http://localhost:5173/icon-color.svg",
@@ -33,7 +33,7 @@ has this shape:
   "action": {
     "title": "Stage Manager (Local)",
     "icon": "http://localhost:5173/icon-bw.svg",
-    "popover": "http://localhost:5173/extension.html?v=1.8.2-local",
+    "popover": "http://localhost:5173/extension.html?v=1.9.0-local",
     "height": 129,
     "width": 375
   }
@@ -74,6 +74,45 @@ If Owlbear reports `Failed to fetch`:
    Vite, remove and re-add the local extension, and reload Owlbear.
 
 Other source changes are hot-reloaded by Vite during development.
+
+### Elevator status API
+
+Other Owlbear Rodeo extensions can temporarily disable or enable a configured
+Elevator without reading or writing Stage Manager metadata. Listen for results
+before sending the request so a fast response is not missed:
+
+```ts
+const requestChannel = "com.ex-asperis.obr-stage-manager/api/v1/elevator/disabled";
+const resultChannel = `${requestChannel}/result`;
+const requestId = crypto.randomUUID();
+
+const unsubscribe = OBR.broadcast.onMessage(resultChannel, ({ data }) => {
+  const result = data as {
+    requestId: string;
+    itemId?: string;
+    ok: boolean;
+    disabled?: boolean;
+    error?: { code: string; message: string };
+  };
+  if (result.requestId !== requestId) return;
+  unsubscribe();
+  if (!result.ok) console.error(result.error);
+});
+
+await OBR.broadcast.sendMessage(requestChannel, {
+  requestId,
+  itemId: "owlbear-item-id",
+  disabled: true,
+}, { destination: "LOCAL" });
+```
+
+Requests must contain a non-empty `requestId`, a non-empty `itemId`, and a
+boolean `disabled`. Stage Manager replies on the result channel with the same
+request ID. Successful replies have `ok: true`; failures have `ok: false` and
+one of these stable error codes: `INVALID_REQUEST`, `UNAUTHORIZED`,
+`ITEM_NOT_FOUND`, `NOT_ELEVATOR`, or `UPDATE_FAILED`. Send with the `LOCAL`
+destination so only the Stage Manager instance on the caller's client handles
+the request. Only a GM with permission to update the item can change its state.
 
 ## What Stage Manager is for
 

@@ -44,6 +44,7 @@ import { applyEffectiveItemState } from "./effectiveItemState";
 import { reorderResolvedStateGroup, reorderResolvedStateGroups, resolveParticipationModel, withLogicalParticipation, withStateGroupSelection } from "./participation";
 import { runOutlinerV1NamespaceConversion } from "./namespaceMigration";
 import type { ElevatorConfiguration } from "./elevator";
+import { applyElevatorDisabled, elevatorDisabledMetadataUpdate, ElevatorControlError } from "./elevatorControl";
 
 let queue: Promise<void> = Promise.resolve();
 let writing = false;
@@ -403,6 +404,20 @@ export function setElevatorConfiguration(itemId: string, configuration?: Elevato
       if (!items[0]) return;
       if (configuration) items[0].metadata[ELEVATOR_METADATA_KEY] = configuration;
       else delete items[0].metadata[ELEVATOR_METADATA_KEY];
+    });
+  });
+}
+
+export function setElevatorDisabled(itemId: string, disabled: boolean) {
+  return serialized(async () => {
+    const existing = (await OBR.scene.items.getItems((item) => item.id === itemId))[0];
+    if (!existing) throw new ElevatorControlError("ITEM_NOT_FOUND", "The requested item was not found.");
+    // Validate before requesting an update so callers receive a stable error even
+    // when Owlbear supplies an empty draft for a stale item ID.
+    elevatorDisabledMetadataUpdate(existing, disabled);
+    await OBR.scene.items.updateItems([itemId], (items) => {
+      if (!items[0]) throw new ElevatorControlError("ITEM_NOT_FOUND", "The requested item was not found.");
+      applyElevatorDisabled(items[0], disabled);
     });
   });
 }

@@ -6,7 +6,11 @@ export type ElevatorDestination =
   | { kind: "native"; layer: Item["layer"] }
   | { kind: "virtual"; virtualLayerId: string };
 
-export type ElevatorConfiguration = { version: 1; destination: ElevatorDestination };
+export type ElevatorConfiguration = {
+  version: 1;
+  destination: ElevatorDestination;
+  disabled?: "true" | "false";
+};
 export type Position = Readonly<{ x: number; y: number }>;
 export type ElevatorTrigger = Item;
 
@@ -40,16 +44,35 @@ export function parseElevatorConfiguration(value: unknown): ElevatorConfiguratio
   if (!destination || typeof destination !== "object") return undefined;
   const candidate = destination as { kind?: unknown; layer?: unknown; virtualLayerId?: unknown };
   if (candidate.kind === "native" && typeof candidate.layer === "string" && NATIVE_LAYERS.has(candidate.layer as Item["layer"])) {
-    return { version: 1, destination: { kind: "native", layer: candidate.layer as Item["layer"] } };
+    return withParsedDisabled(value, { version: 1, destination: { kind: "native", layer: candidate.layer as Item["layer"] } });
   }
   if (candidate.kind === "virtual" && typeof candidate.virtualLayerId === "string" && candidate.virtualLayerId.length > 0) {
-    return { version: 1, destination: { kind: "virtual", virtualLayerId: candidate.virtualLayerId } };
+    return withParsedDisabled(value, { version: 1, destination: { kind: "virtual", virtualLayerId: candidate.virtualLayerId } });
   }
   return undefined;
 }
 
+function withParsedDisabled(value: object, configuration: ElevatorConfiguration): ElevatorConfiguration {
+  const disabled = (value as { disabled?: unknown }).disabled;
+  return disabled === "true" || disabled === "false" ? { ...configuration, disabled } : configuration;
+}
+
 export function getElevatorConfiguration(item: Pick<Item, "metadata">) {
   return parseElevatorConfiguration(item.metadata[ELEVATOR_METADATA_KEY]);
+}
+
+export function isElevatorDisabled(item: Pick<Item, "metadata">) {
+  return getElevatorConfiguration(item)?.disabled === "true";
+}
+
+export function getElevatorToggleAction(item: Pick<Item, "metadata">): "enable" | "disable" | undefined {
+  const configuration = getElevatorConfiguration(item);
+  if (!configuration) return undefined;
+  return configuration.disabled === "true" ? "enable" : "disable";
+}
+
+export function enabledElevatorTriggers<T extends Item>(items: T[]) {
+  return items.filter((item) => Boolean(getElevatorConfiguration(item)) && !isElevatorDisabled(item));
 }
 
 export function polygonVertices(path: Pick<Path, "commands">): Position[] | undefined {

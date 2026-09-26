@@ -4,9 +4,12 @@ import type { BoundingBox, Image, Item, Path, PathCommand, Shape } from "@owlbea
 import { ELEVATOR_METADATA_KEY } from "../src/constants.ts";
 import {
   enteredElevator,
+  enabledElevatorTriggers,
   elevatorDestinationsEqual,
   getElevatorConfiguration,
+  getElevatorToggleAction,
   isElevatorActive,
+  isElevatorDisabled,
   isSupportedElevatorTrigger,
   parseElevatorConfiguration,
   pointInShape,
@@ -187,6 +190,30 @@ test("metadata parsing is defensive and preserves versioned destinations", () =>
   assert.equal(parseElevatorConfiguration("bad"), undefined);
   const item = { metadata: { [ELEVATOR_METADATA_KEY]: configuration } } as Pick<Item, "metadata">;
   assert.deepEqual(getElevatorConfiguration(item), configuration);
+});
+
+test("elevator disabled metadata is backward compatible and only the true string disables behavior", () => {
+  const destination = { kind: "native", layer: "PROP" } as const;
+  const configured = (disabled?: unknown) => ({
+    metadata: { [ELEVATOR_METADATA_KEY]: { version: 1, destination, ...(disabled === undefined ? {} : { disabled }) } },
+  }) as Pick<Item, "metadata">;
+  assert.equal(isElevatorDisabled(configured()), false);
+  assert.equal(isElevatorDisabled(configured("false")), false);
+  assert.equal(isElevatorDisabled(configured("true")), true);
+  assert.equal(isElevatorDisabled(configured(true)), false);
+  assert.equal(getElevatorConfiguration(configured("invalid"))?.disabled, undefined);
+  assert.equal(getElevatorToggleAction(configured()), "disable");
+  assert.equal(getElevatorToggleAction(configured("false")), "disable");
+  assert.equal(getElevatorToggleAction(configured("true")), "enable");
+  assert.equal(getElevatorToggleAction({ metadata: {} }), undefined);
+});
+
+test("enabled elevator selection suppresses disabled triggers without breaking legacy configurations", () => {
+  const configuration = { version: 1, destination: { kind: "native", layer: "PROP" } } as const;
+  const legacy = shape({ id: "legacy", metadata: { [ELEVATOR_METADATA_KEY]: configuration } });
+  const enabled = shape({ id: "enabled", metadata: { [ELEVATOR_METADATA_KEY]: { ...configuration, disabled: "false" } } });
+  const disabled = shape({ id: "disabled", metadata: { [ELEVATOR_METADATA_KEY]: { ...configuration, disabled: "true" } } });
+  assert.deepEqual(enabledElevatorTriggers([legacy, enabled, disabled]).map(({ id }) => id), ["legacy", "enabled"]);
 });
 
 test("independent tokens can enter during the same scene update", () => {

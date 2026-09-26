@@ -1,8 +1,9 @@
 import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import { ELEVATOR_METADATA_KEY, EXTENSION_ID } from "./constants";
-import { enteredElevator, getElevatorConfiguration, isElevatorActive, isElevatorSubject, resolveElevatorDestination, selectWinningElevator, usesPreciseElevatorGeometry, type Position } from "./elevator";
+import { enabledElevatorTriggers, enteredElevator, getElevatorConfiguration, isElevatorActive, isElevatorSubject, resolveElevatorDestination, selectWinningElevator, usesPreciseElevatorGeometry, type Position } from "./elevator";
+import { ELEVATOR_DISABLED_REQUEST_CHANNEL, ELEVATOR_DISABLED_RESULT_CHANNEL, handleElevatorDisabledRequest } from "./elevatorApi";
 import { hasBoundaryViolation, stateFromMetadata, type VirtualLayerState } from "./virtualLayers";
-import { assignItems, enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers } from "./virtualLayerService";
+import { assignItems, enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers, setElevatorDisabled } from "./virtualLayerService";
 import { isAuthoritativeRole, retainExistingSelection, selectedSuppressedItemIds } from "./selectionSuppression";
 
 const SEND_CONTEXT_MENU_ID = `${EXTENSION_ID}/send`;
@@ -12,6 +13,7 @@ let ready = false;
 let unsubscribeItems: (() => void) | undefined;
 let unsubscribeMetadata: (() => void) | undefined;
 let unsubscribePlayer: (() => void) | undefined;
+let unsubscribeElevatorApi: (() => void) | undefined;
 let reconciling = false;
 let reconcilePending = false;
 let latestMetadataState: VirtualLayerState | undefined;
@@ -28,7 +30,7 @@ async function processElevators(items: Item[], previous: ReadonlyMap<string, Pos
   if (epoch !== sceneEpoch) return;
   if (!(await OBR.scene.isReady()) || !isAuthoritativeRole(await OBR.player.getRole())) return;
   const state = latestMetadataState ?? stateFromMetadata(await OBR.scene.getMetadata());
-  const configured = items.filter((item) => getElevatorConfiguration(item) && item.scale.x !== 0 && item.scale.y !== 0);
+  const configured = enabledElevatorTriggers(items).filter((item) => item.scale.x !== 0 && item.scale.y !== 0);
   const fallbackBounds = new Map<string, Awaited<ReturnType<typeof OBR.scene.items.getItemBounds>>>();
   await Promise.all(configured.filter((item) => !usesPreciseElevatorGeometry(item)).map(async (item) => {
     try {
@@ -172,6 +174,12 @@ OBR.onReady(async () => {
       height: 240,
     },
   });
+  unsubscribeElevatorApi = OBR.broadcast.onMessage(ELEVATOR_DISABLED_REQUEST_CHANNEL, ({ data }) => {
+    void OBR.player.getRole()
+      .then((role) => handleElevatorDisabledRequest(data, role, setElevatorDisabled))
+      .then((result) => OBR.broadcast.sendMessage(ELEVATOR_DISABLED_RESULT_CHANNEL, result, { destination: "LOCAL" }))
+      .catch((error) => console.error("Stage Manager could not process an Elevator API request.", error));
+  });
 });
 
 window.addEventListener("beforeunload", () => {
@@ -183,4 +191,5 @@ window.addEventListener("beforeunload", () => {
   unsubscribeItems?.();
   unsubscribeMetadata?.();
   unsubscribePlayer?.();
+  unsubscribeElevatorApi?.();
 });

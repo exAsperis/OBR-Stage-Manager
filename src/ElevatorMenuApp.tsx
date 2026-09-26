@@ -1,6 +1,7 @@
 import CheckIcon from "@mui/icons-material/CheckRounded";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ElevatorIcon from "@mui/icons-material/ElevatorRounded";
+import Divider from "@mui/material/Divider";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -8,11 +9,11 @@ import Typography from "@mui/material/Typography";
 import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import { useEffect, useMemo, useState } from "react";
 import { ELEVATOR_METADATA_KEY } from "./constants";
-import { elevatorDestinationsEqual, getElevatorConfiguration, resolveElevatorDestination, type ElevatorDestination } from "./elevator";
+import { elevatorDestinationsEqual, getElevatorConfiguration, isElevatorDisabled, resolveElevatorDestination, type ElevatorDestination } from "./elevator";
 import { formatLayerName, getOutlinerLayers } from "./layers";
 import { LayerIcon } from "./LayerIcon";
 import { useLayerDisplaySettings } from "./layerSettings";
-import { readVirtualLayerState, setElevatorConfiguration } from "./virtualLayerService";
+import { readVirtualLayerState, setElevatorConfiguration, setElevatorDisabled } from "./virtualLayerService";
 import { EMPTY_VIRTUAL_LAYER_STATE, orderedGroupIds, UNASSIGNED_ID, type VirtualLayerState } from "./virtualLayers";
 
 export function ElevatorMenuApp() {
@@ -42,8 +43,25 @@ export function ElevatorMenuApp() {
     if (!item) return;
     setBusy(true); setError("");
     try {
-      await setElevatorConfiguration(item.id, destination ? { version: 1, destination } : undefined);
-      setItem({ ...item, metadata: destination ? { ...item.metadata, [ELEVATOR_METADATA_KEY]: { version: 1, destination } } : Object.fromEntries(Object.entries(item.metadata).filter(([key]) => key !== ELEVATOR_METADATA_KEY)) });
+      const nextConfiguration = destination
+        ? { version: 1 as const, destination, ...(configuration?.disabled ? { disabled: configuration.disabled } : {}) }
+        : undefined;
+      await setElevatorConfiguration(item.id, nextConfiguration);
+      setItem({ ...item, metadata: nextConfiguration ? { ...item.metadata, [ELEVATOR_METADATA_KEY]: nextConfiguration } : Object.fromEntries(Object.entries(item.metadata).filter(([key]) => key !== ELEVATOR_METADATA_KEY)) });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to update the Elevator.");
+    } finally { setBusy(false); }
+  }
+
+  async function toggleDisabled() {
+    if (!item || !configuration) return;
+    setBusy(true); setError("");
+    try {
+      const disabled = !isElevatorDisabled(item);
+      await setElevatorDisabled(item.id, disabled);
+      setItem({ ...item, metadata: { ...item.metadata, [ELEVATOR_METADATA_KEY]: {
+        ...configuration, disabled: disabled ? "true" : "false",
+      } } });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to update the Elevator.");
     } finally { setBusy(false); }
@@ -55,7 +73,7 @@ export function ElevatorMenuApp() {
 
   return <div id="menu-viewport"><div id="send-menu" role="menu" aria-label="Elevator destination">
     {item && <Typography variant="caption" sx={{ display: "block", px: 1.5, py: .5 }}>
-      {configuration ? `Elevator: ${valid ? "configured" : "destination missing"}` : "Configure as Elevator"}
+      {configuration ? `Elevator: ${valid ? (isElevatorDisabled(item) ? "disabled" : "enabled") : "destination missing"}` : "Configure as Elevator"}
     </Typography>}
     {layers.map((layer) => {
       const nativeDestination = { kind: "native", layer } as const;
@@ -75,9 +93,18 @@ export function ElevatorMenuApp() {
         </ListItemButton>;
       })}
     </div>})}
-    {configuration && <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void save()}>
-      <ListItemIcon sx={{ minWidth: 32 }}><DeleteOutlineIcon fontSize="small" /></ListItemIcon><ListItemText primary="Disable Elevator" />
-    </ListItemButton>}
+    {configuration && <>
+      <Divider />
+      <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void toggleDisabled()}>
+        <ListItemIcon sx={{ minWidth: 32 }}>{isElevatorDisabled(item!)
+          ? <ElevatorIcon fontSize="small" />
+          : <img src={`/elevator-disabled.svg?v=${import.meta.env.VITE_RELEASE_VERSION}`} width="20" height="20" alt="" />}
+        </ListItemIcon><ListItemText primary={`${isElevatorDisabled(item!) ? "Enable" : "Disable"} Elevator`} />
+      </ListItemButton>
+      <ListItemButton dense role="menuitem" disabled={busy} onClick={() => void save()}>
+        <ListItemIcon sx={{ minWidth: 32 }}><DeleteOutlineIcon fontSize="small" /></ListItemIcon><ListItemText primary="Remove Elevator" />
+      </ListItemButton>
+    </>}
     {error && <Typography id="status" role="status" color="error" variant="caption">{error}</Typography>}
   </div></div>;
 }
