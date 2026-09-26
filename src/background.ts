@@ -1,7 +1,7 @@
 import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import { ELEVATOR_METADATA_KEY, EXTENSION_ID } from "./constants";
 import { enabledElevatorTriggers, enteredElevator, getElevatorConfiguration, isElevatorActive, isElevatorSubject, resolveElevatorDestination, selectWinningElevator, usesPreciseElevatorGeometry, type Position } from "./elevator";
-import { ELEVATOR_DISABLED_REQUEST_CHANNEL, ELEVATOR_DISABLED_RESULT_CHANNEL, handleElevatorDisabledRequest } from "./elevatorApi";
+import { ELEVATOR_DISABLED_REQUEST_CHANNEL, ELEVATOR_DISABLED_RESULT_CHANNEL, ELEVATOR_LIST_REQUEST_CHANNEL, ELEVATOR_LIST_RESULT_CHANNEL, handleElevatorDisabledRequest, handleElevatorListRequest } from "./elevatorApi";
 import { hasBoundaryViolation, stateFromMetadata, type VirtualLayerState } from "./virtualLayers";
 import { assignItems, enforceStateInheritance, isVirtualLayerWriteInFlight, normalizeLayers, setElevatorDisabled } from "./virtualLayerService";
 import { isAuthoritativeRole, retainExistingSelection, selectedSuppressedItemIds } from "./selectionSuppression";
@@ -14,6 +14,7 @@ let unsubscribeItems: (() => void) | undefined;
 let unsubscribeMetadata: (() => void) | undefined;
 let unsubscribePlayer: (() => void) | undefined;
 let unsubscribeElevatorApi: (() => void) | undefined;
+let unsubscribeElevatorListApi: (() => void) | undefined;
 let reconciling = false;
 let reconcilePending = false;
 let latestMetadataState: VirtualLayerState | undefined;
@@ -180,6 +181,12 @@ OBR.onReady(async () => {
       .then((result) => OBR.broadcast.sendMessage(ELEVATOR_DISABLED_RESULT_CHANNEL, result, { destination: "LOCAL" }))
       .catch((error) => console.error("Stage Manager could not process an Elevator API request.", error));
   });
+  unsubscribeElevatorListApi = OBR.broadcast.onMessage(ELEVATOR_LIST_REQUEST_CHANNEL, ({ data }) => {
+    void OBR.player.getRole()
+      .then((role) => handleElevatorListRequest(data, role, () => OBR.scene.items.getItems()))
+      .then((result) => OBR.broadcast.sendMessage(ELEVATOR_LIST_RESULT_CHANNEL, result, { destination: "LOCAL" }))
+      .catch((error) => console.error("Stage Manager could not process an Elevator list API request.", error));
+  });
 });
 
 window.addEventListener("beforeunload", () => {
@@ -192,4 +199,5 @@ window.addEventListener("beforeunload", () => {
   unsubscribeMetadata?.();
   unsubscribePlayer?.();
   unsubscribeElevatorApi?.();
+  unsubscribeElevatorListApi?.();
 });

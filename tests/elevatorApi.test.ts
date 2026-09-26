@@ -1,11 +1,53 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ELEVATOR_DISABLED_REQUEST_CHANNEL, ELEVATOR_DISABLED_RESULT_CHANNEL, handleElevatorDisabledRequest, parseElevatorDisabledRequest } from "../src/elevatorApi.ts";
+import { ELEVATOR_DISABLED_REQUEST_CHANNEL, ELEVATOR_DISABLED_RESULT_CHANNEL, ELEVATOR_LIST_REQUEST_CHANNEL, ELEVATOR_LIST_RESULT_CHANNEL, handleElevatorDisabledRequest, handleElevatorListRequest, listElevators, parseElevatorDisabledRequest } from "../src/elevatorApi.ts";
 import { ElevatorControlError } from "../src/elevatorControl.ts";
+import { ELEVATOR_METADATA_KEY } from "../src/constants.ts";
 
 test("publishes stable versioned Elevator API channels", () => {
   assert.equal(ELEVATOR_DISABLED_REQUEST_CHANNEL, "com.ex-asperis.obr-stage-manager/api/v1/elevator/disabled");
   assert.equal(ELEVATOR_DISABLED_RESULT_CHANNEL, `${ELEVATOR_DISABLED_REQUEST_CHANNEL}/result`);
+  assert.equal(ELEVATOR_LIST_REQUEST_CHANNEL, "com.ex-asperis.obr-stage-manager/api/v1/elevator/list");
+  assert.equal(ELEVATOR_LIST_RESULT_CHANNEL, `${ELEVATOR_LIST_REQUEST_CHANNEL}/result`);
+});
+
+test("lists every configured Elevator regardless of disabled state", () => {
+  const destination = { kind: "native", layer: "PROP" } as const;
+  const item = (id: string, disabled?: unknown) => ({ id, name: `Elevator ${id}`, metadata: {
+    [ELEVATOR_METADATA_KEY]: { version: 1, destination, ...(disabled === undefined ? {} : { disabled }) },
+  } });
+  assert.deepEqual(listElevators([
+    item("legacy"), item("disabled", "true"), item("enabled", "false"), item("malformed", true),
+    { id: "ordinary", name: "Ordinary", metadata: {} },
+  ]), [
+    { itemId: "disabled", name: "Elevator disabled", disabled: true },
+    { itemId: "enabled", name: "Elevator enabled", disabled: false },
+    { itemId: "legacy", name: "Elevator legacy", disabled: false },
+    { itemId: "malformed", name: "Elevator malformed", disabled: false },
+  ]);
+});
+
+test("handles correlated Elevator list requests", async () => {
+  const destination = { kind: "native", layer: "PROP" } as const;
+  const result = await handleElevatorListRequest({ requestId: "list-1" }, "GM", async () => [{
+    id: "lift", name: "Main Lift", metadata: { [ELEVATOR_METADATA_KEY]: { version: 1, destination, disabled: "true" } },
+  }]);
+  assert.deepEqual(result, { requestId: "list-1", ok: true, elevators: [{ itemId: "lift", name: "Main Lift", disabled: true }] });
+});
+
+test("validates, authorizes, and reports Elevator list failures", async () => {
+  let called = false;
+  const getItems = async () => { called = true; return []; };
+  assert.deepEqual(await handleElevatorListRequest({}, "GM", getItems), {
+    requestId: "", ok: false, error: { code: "INVALID_REQUEST", message: "Expected a non-empty requestId." },
+  });
+  assert.deepEqual(await handleElevatorListRequest({ requestId: "r" }, "PLAYER", getItems), {
+    requestId: "r", ok: false, error: { code: "UNAUTHORIZED", message: "Only a GM may list Elevators." },
+  });
+  assert.equal(called, false);
+  assert.deepEqual(await handleElevatorListRequest({ requestId: "r" }, "GM", async () => { throw new Error("read failure"); }), {
+    requestId: "r", ok: false, error: { code: "LIST_FAILED", message: "read failure" },
+  });
 });
 
 test("validates Elevator API requests", () => {

@@ -24,7 +24,7 @@ has this shape:
 ```json
 {
   "name": "Stage Manager (Local)",
-  "version": "1.9.0-local",
+  "version": "1.10.0-local",
   "manifest_version": 1,
   "author": "ex Asperis",
   "icon": "http://localhost:5173/icon-color.svg",
@@ -33,7 +33,7 @@ has this shape:
   "action": {
     "title": "Stage Manager (Local)",
     "icon": "http://localhost:5173/icon-bw.svg",
-    "popover": "http://localhost:5173/extension.html?v=1.9.0-local",
+    "popover": "http://localhost:5173/extension.html?v=1.10.0-local",
     "height": 129,
     "width": 375
   }
@@ -113,6 +113,28 @@ one of these stable error codes: `INVALID_REQUEST`, `UNAUTHORIZED`,
 `ITEM_NOT_FOUND`, `NOT_ELEVATOR`, or `UPDATE_FAILED`. Send with the `LOCAL`
 destination so only the Stage Manager instance on the caller's client handles
 the request. Only a GM with permission to update the item can change its state.
+
+To discover every configured Elevator in the current Scene, send
+`{ requestId }` to
+`com.ex-asperis.obr-stage-manager/api/v1/elevator/list` with destination
+`LOCAL` and listen on the same channel with `/result` appended. A successful
+reply has this shape:
+
+```ts
+{
+  requestId: string;
+  ok: true;
+  elevators: Array<{
+    itemId: string;
+    name: string;
+    disabled: boolean;
+  }>;
+}
+```
+
+The response includes all valid configured Elevators, whether enabled or
+disabled. Elevators without a `disabled` metadata field report `false`.
+Failures use `INVALID_REQUEST`, `UNAUTHORIZED`, or `LIST_FAILED`.
 
 ## What Stage Manager is for
 
